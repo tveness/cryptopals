@@ -16,6 +16,7 @@ fn main() -> Result<()> {
 
     match args.challenge {
         1 => challenges::one::main(),
+        2 => challenges::two::main(),
         _ => Err(anyhow!("Invalid challenge number")),
     }
 }
