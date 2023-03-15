@@ -36,6 +36,16 @@ pub fn freq_map_from_file(filename: &str) -> Result<HashMap<char, f64>> {
     Ok(map)
 }
 
+pub fn read_file(filename: &str) -> Result<Vec<String>> {
+    let mut v = Vec::<String>::new();
+    let f = File::open(filename)?;
+    let reader = BufReader::new(f);
+    for line in reader.lines() {
+        v.push(line?);
+    }
+    Ok(v)
+}
+
 pub fn freq_map_from_str(input: &str) -> Result<HashMap<char, f64>> {
     let mut map = HashMap::new();
     for c in input.chars() {
