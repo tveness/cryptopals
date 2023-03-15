@@ -33,3 +33,12 @@ pub fn main() -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn two() {
+        main().unwrap();
+    }
+}
