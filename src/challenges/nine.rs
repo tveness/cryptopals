@@ -44,6 +44,9 @@ mod tests {
         let target = b"YELLOW SUBMARINE\x04\x04\x04\x04";
 
         assert_eq!(&pkcs7_pad(input, 20), target);
+        // Tests multiple blocks
+        assert_eq!(&pkcs7_pad(input, 10), target);
+        assert_eq!(&pkcs7_pad(input, 5), target);
 
         let target_shorter = b"YELLOW SUBMARINE\x03\x03\x03";
         assert_eq!(&pkcs7_pad(input, 19), target_shorter);

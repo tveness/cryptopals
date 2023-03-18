@@ -48,8 +48,10 @@
 //! experience is any guideline, this attack will get you code execution in security tests about
 //! once a year.
 
+use std::collections::HashMap;
+
 use crate::utils::*;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use base64::{engine::general_purpose, Engine as _};
 
 pub fn main() -> Result<()> {
@@ -57,7 +59,53 @@ pub fn main() -> Result<()> {
     // Need a fixed key over the duration
     let key = random_key(16, &mut rng);
 
+    // 1. Determine block size
+    let mut padder: Vec<u8> = b"AA".to_vec();
+    while is_unique(&oracle(&padder, &key)?[..padder.len()], padder.len() / 2) {
+        padder.extend_from_slice(b"A");
+    }
+    let block_size = padder.len() / 2;
+    println!("Inferred block size: {block_size}");
+
+    // 2. Confirm ECB
+    let ciphertext_mode = detect_mode_explicit(&oracle(&padder, &key)?, block_size);
+    println!("Mode: {:?}", ciphertext_mode);
+
+    let mut decrypted_message: Vec<u8> = Vec::with_capacity(oracle(b"", &key).len());
+
+    while let Ok(next_byte) = get_next_byte(&decrypted_message, &key, block_size) {
+        decrypted_message.push(next_byte);
+        println!("{}", std::str::from_utf8(&decrypted_message).unwrap());
+    }
+
     Ok(())
+}
+fn get_next_byte(current_state: &[u8], key: &[u8], bs: usize) -> Result<u8> {
+    let base_buffer = b"";
+    let mut lookup = HashMap::new();
+    // Construct lookup table for current scenario
+    for b in 0..255_u8 {
+        let mut dangling = vec![];
+        dangling.push(b);
+        let enc = oracle(&dangling, &key)?[..bs].to_vec();
+        lookup.insert(enc, b);
+    }
+    // Now run with slightly smaller dangling string
+    let dangling = vec![];
+    // Select correct block to look at
+    let enc = oracle(&dangling, &key)?[..bs].to_vec();
+
+    match lookup.get(&enc) {
+        Some(b) => Ok(*b),
+        None => Err(anyhow!("Failed to find correct block in lookup table")),
+    }
+}
+
+pub fn detect_mode_explicit(ciphertext: &[u8], bs: usize) -> Mode {
+    match is_unique(ciphertext, bs) {
+        true => Mode::Cbc,
+        false => Mode::Ecb,
+    }
 }
 
 fn oracle(input: &[u8], key: &[u8]) -> Result<Vec<u8>> {
@@ -65,8 +113,10 @@ fn oracle(input: &[u8], key: &[u8]) -> Result<Vec<u8>> {
     let secret_bytes = general_purpose::STANDARD.decode(secret_base_64)?;
     let mut input = input.to_vec();
     input.extend_from_slice(&secret_bytes);
+    // Make sure it's padded!
+    let padded = pkcs7_pad(&input, key.len());
 
-    let encrypted = cbc_encrypt(&input, key, None)?;
+    let encrypted = ecb_encrypt(&padded, key, None)?;
 
     Ok(encrypted)
 }
