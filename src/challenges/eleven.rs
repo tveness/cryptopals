@@ -1,4 +1,5 @@
 //!  An ECB/CBC detection oracle
+//!
 //! Now that you have ECB and CBC working:
 //!
 //! Write a function to generate a random AES key; that's just 16 random bytes.

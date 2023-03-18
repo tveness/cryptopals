@@ -1,4 +1,5 @@
 //! ECB cut-and-paste
+//!
 //! Write a k=v parsing routine, as if for a structured cookie. The routine should take:
 //!
 //! ```text

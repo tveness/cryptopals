@@ -1,13 +1,15 @@
+//! Detect single-character XOR
+//!
+//! One of the 60-character strings in this file has been encrypted by single-character XOR.
+//!
+//! Find it.
+//!
+//! (Your code from #3 should help.)
+
 use std::collections::HashMap;
 
 use crate::utils::*;
 use anyhow::Result;
-///Detect single-character XOR
-///One of the 60-character strings in this file has been encrypted by single-character XOR.
-///
-///Find it.
-///
-///(Your code from #3 should help.)
 
 pub fn main() -> Result<()> {
     four_result()?;

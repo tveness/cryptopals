@@ -1,3 +1,5 @@
+//! Implement CBC mode
+//!
 //! CBC mode is a block cipher mode that allows us to encrypt irregularly-sized messages, despite
 //! the fact that a block cipher natively only transforms individual blocks.
 //!
