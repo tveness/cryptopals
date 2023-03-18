@@ -69,7 +69,7 @@ pub fn encryption_oracle(input: &[u8]) -> Result<(Vec<u8>, Mode)> {
     Ok((encrypted, mode))
 }
 
-fn random_key(l: usize, rng: &mut ThreadRng) -> Vec<u8> {
+pub fn random_key(l: usize, rng: &mut ThreadRng) -> Vec<u8> {
     let mut v = vec![0; l];
     rng.fill(&mut v[..l]);
     v
