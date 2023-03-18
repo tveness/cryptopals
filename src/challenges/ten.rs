@@ -113,17 +113,98 @@ pub fn cbc_encrypt(plaintext: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<Ve
     }
     Ok(encrypted)
 }
+pub fn ecb_decrypt(ciphertext: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<Vec<u8>> {
+    let mut decrypted = vec![];
+    let mut iv = match iv {
+        None => vec![0; key.len()],
+        Some(x) => x.to_vec(),
+    };
+    let cipher = Cipher::aes_128_ecb();
+    let mut decrypter = Crypter::new(cipher, Mode::Decrypt, key, None)?;
+    // Pad is on by default, this the problem with the simpler "decrypt" option
+    decrypter.pad(false);
+
+    let keysize = key.len();
+    let total_blocks = ciphertext.len() / keysize;
+
+    // Must be big enough to contain padding of a complete block
+    let mut plaintext = vec![0; 2 * keysize];
+
+    for block_num in 0..total_blocks {
+        // Grab next block
+        let block_ciphertext = &ciphertext[block_num * keysize..keysize * (block_num + 1)];
+
+        // Decrypt
+        decrypter.update(&block_ciphertext, &mut plaintext)?;
+        let xored = plaintext
+            .iter()
+            .take(keysize)
+            .zip(iv.iter())
+            .map(|(v1, v2)| v1 ^ v2)
+            .collect::<Vec<u8>>();
+
+        // Add data to next slice
+        decrypted.extend_from_slice(&xored);
+    }
+    Ok(decrypted)
+}
+
+pub fn ecb_encrypt(plaintext: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<Vec<u8>> {
+    let mut encrypted = vec![];
+    let mut iv = match iv {
+        None => vec![0; key.len()],
+        Some(x) => x.to_vec(),
+    };
+    let cipher = Cipher::aes_128_ecb();
+    let mut encrypter = Crypter::new(cipher, Mode::Encrypt, key, None)?;
+    // Pad is on by default, this the problem with the simpler "decrypt" option
+    encrypter.pad(false);
+
+    let keysize = key.len();
+    let total_blocks = plaintext.len() / keysize;
+
+    // Must be big enough to contain padding of a complete block
+    let mut ciphertext = vec![0; 2 * keysize];
+
+    for block_num in 0..total_blocks {
+        // Grab next block
+        let block_plaintext = &plaintext[block_num * keysize..keysize * (block_num + 1)];
+
+        let xored_plaintext = block_plaintext
+            .iter()
+            .take(keysize)
+            .zip(iv.iter())
+            .map(|(v1, v2)| v1 ^ v2)
+            .collect::<Vec<u8>>();
+
+        // Encrypt
+        encrypter.update(&xored_plaintext, &mut ciphertext)?;
+
+        // Add data to next slice
+        encrypted.extend_from_slice(&ciphertext[..keysize]);
+    }
+    Ok(encrypted)
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn round_trip() {
+    fn round_trip_cbc() {
         let key = b"YELLOW SUBMARINE";
         let message = b"IN A TOWN WHERE I WAS BORN LIVED".to_vec();
         let encrypted = cbc_encrypt(&message, key, None).unwrap();
         let decrypted = cbc_decrypt(&encrypted, key, None).unwrap();
+
+        assert_eq!(&message, &decrypted);
+    }
+    #[test]
+    fn round_trip_ecb() {
+        let key = b"YELLOW SUBMARINE";
+        let message = b"IN A TOWN WHERE I WAS BORN LIVED".to_vec();
+        let encrypted = ecb_encrypt(&message, key, None).unwrap();
+        let decrypted = ecb_decrypt(&encrypted, key, None).unwrap();
 
         assert_eq!(&message, &decrypted);
     }

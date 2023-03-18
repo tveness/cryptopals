@@ -4,6 +4,8 @@ use std::{collections::HashMap, fs::File, io::BufReader};
 
 // Re-export useful functions introduced in specific challenges
 pub use crate::challenges::nine::pkcs7_pad;
+pub use crate::challenges::ten::{cbc_decrypt, cbc_encrypt};
+pub use crate::challenges::ten::{ecb_decrypt, ecb_encrypt};
 
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
