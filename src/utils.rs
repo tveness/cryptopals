@@ -2,6 +2,9 @@ use std::hash::Hash;
 use std::io::BufRead;
 use std::{collections::HashMap, fs::File, io::BufReader};
 
+// Re-export useful functions introduced in specific challenges
+pub use crate::challenges::nine::pkcs7_pad;
+
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
 
