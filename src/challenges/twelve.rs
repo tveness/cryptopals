@@ -71,29 +71,47 @@ pub fn main() -> Result<()> {
     let ciphertext_mode = detect_mode_explicit(&oracle(&padder, &key)?, block_size);
     println!("Mode: {:?}", ciphertext_mode);
 
-    let mut decrypted_message: Vec<u8> = Vec::with_capacity(oracle(b"", &key).len());
+    let mut decrypted_message: Vec<u8> = Vec::with_capacity(oracle(b"", &key)?.len());
 
     while let Ok(next_byte) = get_next_byte(&decrypted_message, &key, block_size) {
         decrypted_message.push(next_byte);
-        println!("{}", std::str::from_utf8(&decrypted_message).unwrap());
+        //        println!("{}", std::str::from_utf8(&decrypted_message).unwrap());
     }
+    println!("{}", std::str::from_utf8(&decrypted_message).unwrap());
 
     Ok(())
 }
 fn get_next_byte(current_state: &[u8], key: &[u8], bs: usize) -> Result<u8> {
-    let base_buffer = b"";
     let mut lookup = HashMap::new();
+
     // Construct lookup table for current scenario
-    for b in 0..255_u8 {
-        let mut dangling = vec![];
-        dangling.push(b);
-        let enc = oracle(&dangling, &key)?[..bs].to_vec();
+    // Say we know the message is "In a town"
+    // Then the dangling is going to be padding this out so that
+    // we know the string except for the last letter and that it matches with
+    // the block size i.e.
+    // |<------16------>|
+    // |AAAAAAIn a townb|
+    //
+    // So the number of padding bytes is
+    let padding_size = bs - 1 - (current_state.len() % bs);
+    // Don't want trailing 1 from padding on the final byte
+    for b in 2..255_u8 {
+        // This runs from 0..=bs-1 as modulo is the same
+
+        let mut padded: Vec<u8> = vec![65_u8; padding_size];
+        padded.extend_from_slice(&current_state);
+        padded.push(b);
+        let dangling = &padded[padded.len() - bs..padded.len()];
+        let enc = oracle(dangling, &key)?[..bs].to_vec();
         lookup.insert(enc, b);
     }
     // Now run with slightly smaller dangling string
-    let dangling = vec![];
+    let padded: Vec<u8> = vec![65_u8; padding_size];
+    // |<------16------>|
+    // |AAAAAAIn a town?|
     // Select correct block to look at
-    let enc = oracle(&dangling, &key)?[..bs].to_vec();
+    let block = current_state.len() / bs;
+    let enc = oracle(&padded, &key)?[block * bs..(block + 1) * bs].to_vec();
 
     match lookup.get(&enc) {
         Some(b) => Ok(*b),
@@ -126,5 +144,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_cracking() {}
+    fn test_cracking() {
+        let secret_base_64 = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK";
+        let secret_bytes = general_purpose::STANDARD.decode(secret_base_64).unwrap();
+        let mut rng = rand::thread_rng();
+        // Need a fixed key over the duration
+        let key = random_key(16, &mut rng);
+
+        let block_size = 16;
+        let mut decrypted_message: Vec<u8> = Vec::with_capacity(oracle(b"", &key).unwrap().len());
+
+        while let Ok(next_byte) = get_next_byte(&decrypted_message, &key, block_size) {
+            decrypted_message.push(next_byte);
+        }
+        assert_eq!(&decrypted_message, &secret_bytes);
+    }
 }
