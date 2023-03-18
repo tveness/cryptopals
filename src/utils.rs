@@ -9,6 +9,7 @@ pub use crate::challenges::eleven::{detect_mode, random_key, Mode};
 pub use crate::challenges::nine::pkcs7_pad;
 pub use crate::challenges::ten::{cbc_decrypt, cbc_encrypt};
 pub use crate::challenges::ten::{ecb_decrypt, ecb_encrypt};
+pub use crate::challenges::thirteen::{pkcs7_unpad, PaddingError};
 
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
