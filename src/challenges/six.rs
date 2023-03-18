@@ -41,7 +41,6 @@ pub fn main() -> Result<()> {
     // i.e. block 1: 0, keysize, 2*keysize, ...
     //      block 2: 1, keysize+1, 2*keysize+1, ...
     let whole_blocks: usize = bytes.len() / keysize;
-    let bytes = bytes.clone();
     let key_chunks = (0..keysize)
         .map(|key_index| {
             (0..whole_blocks)
@@ -80,7 +79,7 @@ fn get_keysize(input: &[u8]) -> usize {
         false => acc,
     });
     println!("top: {top:?}");
-    top.0 as usize
+    top.0
 }
 
 fn get_hamming_with_keysize(input: &[u8], keysize: usize) -> f64 {
@@ -91,7 +90,7 @@ fn get_hamming_with_keysize(input: &[u8], keysize: usize) -> f64 {
 
     let s = std::iter::zip(block, blockshift)
         .map(|(x, y)| x ^ y)
-        .map(|x| ones(x))
+        .map(ones)
         .sum::<u64>();
     s as f64 / (l as f64)
 }

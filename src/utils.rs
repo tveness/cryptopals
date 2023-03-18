@@ -55,8 +55,20 @@ pub fn crack_single_byte_xor(input_bytes: &[u8], ref_map: &HashMap<char, f64>) -
                 true => (*x.0, *x.1),
                 false => acc,
             });
-    let b = best_score.0 as u8;
+    let b = best_score.0;
     Ok(b)
+}
+pub fn read_base64_lines(filename: &str) -> Result<Vec<Vec<u8>>> {
+    let mut v = vec![];
+    let f = File::open(filename)?;
+    let reader = BufReader::new(f);
+    for line in reader.lines() {
+        let l = line?;
+        let s = l.trim_end_matches(char::is_whitespace);
+        let res = general_purpose::STANDARD.decode(s)?;
+        v.push(res);
+    }
+    Ok(v)
 }
 
 pub fn read_base64_file(filename: &str) -> Result<Vec<u8>> {
@@ -134,7 +146,7 @@ pub fn hamming(str1: &str, str2: &str) -> u64 {
 pub fn hamming_bytes(b1: &[u8], b2: &[u8]) -> u64 {
     std::iter::zip(b1.iter(), b2.iter())
         .map(|(x, y)| x ^ y)
-        .map(|x| ones(x))
+        .map(ones)
         .sum()
 }
 
