@@ -99,10 +99,10 @@ fn get_next_byte(current_state: &[u8], key: &[u8], bs: usize) -> Result<u8> {
         // This runs from 0..=bs-1 as modulo is the same
 
         let mut padded: Vec<u8> = vec![65_u8; padding_size];
-        padded.extend_from_slice(&current_state);
+        padded.extend_from_slice(current_state);
         padded.push(b);
         let dangling = &padded[padded.len() - bs..padded.len()];
-        let enc = oracle(dangling, &key)?[..bs].to_vec();
+        let enc = oracle(dangling, key)?[..bs].to_vec();
         lookup.insert(enc, b);
     }
     // Now run with slightly smaller dangling string
@@ -111,7 +111,7 @@ fn get_next_byte(current_state: &[u8], key: &[u8], bs: usize) -> Result<u8> {
     // |AAAAAAIn a town?|
     // Select correct block to look at
     let block = current_state.len() / bs;
-    let enc = oracle(&padded, &key)?[block * bs..(block + 1) * bs].to_vec();
+    let enc = oracle(&padded, key)?[block * bs..(block + 1) * bs].to_vec();
 
     match lookup.get(&enc) {
         Some(b) => Ok(*b),
