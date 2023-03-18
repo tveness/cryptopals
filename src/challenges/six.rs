@@ -73,7 +73,7 @@ fn get_keysize(input: &[u8]) -> usize {
         let ham = get_hamming_with_keysize(input, keysize);
         map.insert(keysize, ham / keysize as f64);
     }
-    println!("{:?}", map);
+    println!("{map:?}");
     let top = map.iter().fold((0, 50.0), |acc, (x, v)| match *v < acc.1 {
         true => (*x, *v),
         false => acc,

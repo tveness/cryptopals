@@ -50,7 +50,7 @@ mod tests {
     #[test]
     fn test_unique() {
         let text: Vec<u8> = vec![1, 2, 3, 1, 2, 3];
-        assert_eq!(is_unique(&text, 2), true);
-        assert_eq!(is_unique(&text, 3), false);
+        assert!(is_unique(&text, 2));
+        assert!(is_unique(&text, 3));
     }
 }
