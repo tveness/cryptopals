@@ -25,7 +25,7 @@ pub fn main() -> Result<()> {
     Ok(())
 }
 
-fn is_unique(text: &[u8], chunk_size: usize) -> bool {
+pub fn is_unique(text: &[u8], chunk_size: usize) -> bool {
     let mut map = HashMap::new();
 
     let mut v = vec![0; chunk_size];

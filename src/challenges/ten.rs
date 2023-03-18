@@ -57,7 +57,7 @@ pub fn cbc_decrypt(ciphertext: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<V
         let block_ciphertext = &ciphertext[block_num * keysize..keysize * (block_num + 1)];
 
         // Decrypt
-        decrypter.update(&block_ciphertext, &mut plaintext)?;
+        decrypter.update(block_ciphertext, &mut plaintext)?;
         let xored = plaintext
             .iter()
             .take(keysize)
@@ -115,7 +115,7 @@ pub fn cbc_encrypt(plaintext: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<Ve
 }
 pub fn ecb_decrypt(ciphertext: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<Vec<u8>> {
     let mut decrypted = vec![];
-    let mut iv = match iv {
+    let iv = match iv {
         None => vec![0; key.len()],
         Some(x) => x.to_vec(),
     };
@@ -135,7 +135,7 @@ pub fn ecb_decrypt(ciphertext: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<V
         let block_ciphertext = &ciphertext[block_num * keysize..keysize * (block_num + 1)];
 
         // Decrypt
-        decrypter.update(&block_ciphertext, &mut plaintext)?;
+        decrypter.update(block_ciphertext, &mut plaintext)?;
         let xored = plaintext
             .iter()
             .take(keysize)
@@ -151,7 +151,7 @@ pub fn ecb_decrypt(ciphertext: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<V
 
 pub fn ecb_encrypt(plaintext: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<Vec<u8>> {
     let mut encrypted = vec![];
-    let mut iv = match iv {
+    let iv = match iv {
         None => vec![0; key.len()],
         Some(x) => x.to_vec(),
     };

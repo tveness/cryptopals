@@ -17,18 +17,34 @@
 //!
 //! Detect the block cipher mode the function is using each time. You should end up with a piece of code that, pointed at a block box that might be encrypting ECB or CBC, tells you which one is happening.
 
+#[derive(Debug, PartialEq)]
+pub enum Mode {
+    Cbc,
+    Ecb,
+}
+
 use crate::utils::*;
 use anyhow::Result;
 use rand::{prelude::*, Rng};
 
 pub fn main() -> Result<()> {
-    let input = b"IN A TOWN WHERE I WAS BORN LIVED";
-    let encrypted = encryption_oracle(input)?;
+    let input = b"YELLOW SUBMARINEYELLOW SUBMARINEYELLOW SUBMARINEYELLOW SUBMARINE";
+    let (encrypted, mode) = encryption_oracle(input)?;
+    let detected_mode = detect_mode(&encrypted);
     println!("Encrypted: {:?}", encrypted);
+    println!("Mode: {:?}", mode);
+    println!("Detected mode: {:?}", detected_mode);
     Ok(())
 }
 
-pub fn encryption_oracle(input: &[u8]) -> Result<Vec<u8>> {
+pub fn detect_mode(ciphertext: &[u8]) -> Mode {
+    match is_unique(ciphertext, 16) {
+        true => Mode::Cbc,
+        false => Mode::Ecb,
+    }
+}
+
+pub fn encryption_oracle(input: &[u8]) -> Result<(Vec<u8>, Mode)> {
     let mut rng = rand::thread_rng();
 
     let key = random_key(16, &mut rng);
@@ -37,16 +53,20 @@ pub fn encryption_oracle(input: &[u8]) -> Result<Vec<u8>> {
 
     let mut modified_input = vec![];
     modified_input.extend_from_slice(&prepend_bytes);
-    modified_input.extend_from_slice(&input);
+    modified_input.extend_from_slice(input);
     modified_input.extend_from_slice(&append_bytes);
     let coin_toss = rng.gen::<bool>();
-
-    let encrypted = match coin_toss {
-        true => cbc_encrypt(input, &key, None)?,
-        false => ecb_encrypt(input, &key, None)?,
+    let mode = match coin_toss {
+        true => Mode::Cbc,
+        false => Mode::Ecb,
     };
 
-    Ok(encrypted)
+    let encrypted = match mode {
+        Mode::Cbc => cbc_encrypt(input, &key, None)?,
+        Mode::Ecb => ecb_encrypt(input, &key, None)?,
+    };
+
+    Ok((encrypted, mode))
 }
 
 fn random_key(l: usize, rng: &mut ThreadRng) -> Vec<u8> {
@@ -60,4 +80,18 @@ fn random_bytes(a: usize, b: usize, rng: &mut ThreadRng) -> Vec<u8> {
     let mut v = vec![0; len];
     rng.fill(&mut v[..len]);
     v
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn oracle_detector() {
+        for _ in 0..100 {
+            let input = b"YELLOW SUBMARINEYELLOW SUBMARINEYELLOW SUBMARINEYELLOW SUBMARINE";
+            let (encrypted, mode) = encryption_oracle(input).unwrap();
+            let detected_mode = detect_mode(&encrypted);
+            assert_eq!(mode, detected_mode);
+        }
+    }
 }
