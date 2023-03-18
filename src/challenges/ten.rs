@@ -20,7 +20,7 @@
 
 use crate::utils::*;
 use anyhow::Result;
-use openssl::symm::{decrypt, Cipher};
+use openssl::symm::{Cipher, Crypter, Mode};
 
 pub fn main() -> Result<()> {
     let ciphertext = read_base64_file("./data/10.txt")?;
@@ -42,23 +42,89 @@ pub fn cbc_decrypt(ciphertext: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<V
         Some(x) => x.to_vec(),
     };
     let cipher = Cipher::aes_128_ecb();
+    let mut decrypter = Crypter::new(cipher, Mode::Decrypt, key, None)?;
+    // Pad is on by default, this the problem with the simpler "decrypt" option
+    decrypter.pad(false);
+
     let keysize = key.len();
     let total_blocks = ciphertext.len() / keysize;
 
+    // Must be big enough to contain padding of a complete block
+    let mut plaintext = vec![0; 2 * keysize];
+
     for block_num in 0..total_blocks {
+        // Grab next block
         let block_ciphertext = &ciphertext[block_num * keysize..keysize * (block_num + 1)];
-        println!("Block: {block_ciphertext:?}");
-        println!("Block len: {:?}", block_ciphertext.len());
-        println!("Key len: {keysize:?}");
-        println!("Key: {key:?}");
 
-        let plaintext = decrypt(cipher, key, None, block_ciphertext)?;
-        println!("Plaintext: {}", std::str::from_utf8(&plaintext)?);
+        // Decrypt
+        decrypter.update(&block_ciphertext, &mut plaintext)?;
+        let xored = plaintext
+            .iter()
+            .take(keysize)
+            .zip(iv.iter())
+            .map(|(v1, v2)| v1 ^ v2)
+            .collect::<Vec<u8>>();
 
+        // Update iv with previous one
         iv = block_ciphertext.to_vec();
-        decrypted.extend_from_slice(&plaintext);
-    }
-    println!("Decrypted: {}", std::str::from_utf8(&decrypted)?);
 
+        // Add data to next slice
+        decrypted.extend_from_slice(&xored);
+    }
     Ok(decrypted)
+}
+
+pub fn cbc_encrypt(plaintext: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<Vec<u8>> {
+    let mut encrypted = vec![];
+    let mut iv = match iv {
+        None => vec![0; key.len()],
+        Some(x) => x.to_vec(),
+    };
+    let cipher = Cipher::aes_128_ecb();
+    let mut encrypter = Crypter::new(cipher, Mode::Encrypt, key, None)?;
+    // Pad is on by default, this the problem with the simpler "decrypt" option
+    encrypter.pad(false);
+
+    let keysize = key.len();
+    let total_blocks = plaintext.len() / keysize;
+
+    // Must be big enough to contain padding of a complete block
+    let mut ciphertext = vec![0; 2 * keysize];
+
+    for block_num in 0..total_blocks {
+        // Grab next block
+        let block_plaintext = &plaintext[block_num * keysize..keysize * (block_num + 1)];
+
+        let xored_plaintext = block_plaintext
+            .iter()
+            .take(keysize)
+            .zip(iv.iter())
+            .map(|(v1, v2)| v1 ^ v2)
+            .collect::<Vec<u8>>();
+
+        // Encrypt
+        encrypter.update(&xored_plaintext, &mut ciphertext)?;
+
+        // Update iv with previous one
+        iv = ciphertext[..keysize].to_vec();
+
+        // Add data to next slice
+        encrypted.extend_from_slice(&ciphertext[..keysize]);
+    }
+    Ok(encrypted)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn round_trip() {
+        let key = b"YELLOW SUBMARINE";
+        let message = b"IN A TOWN WHERE I WAS BORN LIVED".to_vec();
+        let encrypted = cbc_encrypt(&message, key, None).unwrap();
+        let decrypted = cbc_decrypt(&encrypted, key, None).unwrap();
+
+        assert_eq!(&message, &decrypted);
+    }
 }
