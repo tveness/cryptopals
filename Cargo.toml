@@ -10,3 +10,4 @@ anyhow = "1.0.69"
 base64 = "0.21.0"
 clap = { version = "4.1.8", features = ["derive"] }
 hex = "0.4.3"
+openssl = "0.10.46"
