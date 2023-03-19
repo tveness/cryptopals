@@ -88,7 +88,7 @@ fn poor_serialize(cred: Credentials) -> String {
 fn profile_for(who: &str) -> String {
     let who = who.escape_default().to_string();
     let c = Credentials {
-        email: who.to_string(),
+        email: who,
         uid: 10,
         role: "user".to_string(),
     };
@@ -121,7 +121,7 @@ pub fn pkcs7_unpad(bytes: &[u8]) -> Result<Vec<u8>, PaddingError> {
     let padding_val = bytes[l - 1];
     let padding = &bytes[l - padding_val as usize..l];
     let padding_target = vec![padding_val; padding_val as usize];
-    match padding == &padding_target {
+    match padding == padding_target {
         true => Ok(bytes[..l - padding_val as usize].to_vec()),
         false => Err(PaddingError::InvalidPadding),
     }
@@ -130,17 +130,40 @@ pub fn pkcs7_unpad(bytes: &[u8]) -> Result<Vec<u8>, PaddingError> {
 pub fn main() -> Result<()> {
     let mut rng = rand::thread_rng();
     let key = random_key(16, &mut rng);
-    let user_profile = Credentials {
-        email: "foo@bar.com".to_string(),
-        uid: 10,
-        role: "user".to_string(),
-    };
 
     // What are the rules of the game?
     // We can ask for the profile for anyone, and get an encrypted version spit back
     // We can feed in an encrypted version and get a profile back
 
-    let cred = decrypting_oracle(&encrypting_oracle("test_user", &key), &key)?;
+    //let cred = decrypting_oracle(&encrypting_oracle("test_user", &key), &key)?;
+
+    // A
+    // email=foo@bar.com&uid=10&role=user
+    // |         |        |         |user      |
+    // We want to push the padding over to a new block, and then four more, to get the encrypted
+    // version of something with user on the end
+    // We then need to get a way to find an encrypted block with just |admin| in it.
+    // Well, we don't quite need that, we really just need to pad the end of a user with
+    // admin such that it lies at a boundary
+    // |email=foo@bar.com|admin&uid=10&qwe|
+    // And then cut a paste these blocks
+    // |                |                |                |                |
+    //  email=foo@bar.co admin&uid=10&rol e=user
+    //  email=foo@bar.co adm&uid=10&role= user
+
+    let s1 = "foo@bar.coadmin";
+    let s2 = "foo@bar.coadm";
+    let shift1 = encrypting_oracle(s1, &key);
+    let shift2 = encrypting_oracle(s2, &key);
+
+    let mut pasted: Vec<u8> = vec![];
+    pasted.extend_from_slice(&shift2[..32]);
+    pasted.extend_from_slice(&shift1[16..32]);
+    // Put valid padding back on the end
+    pasted.extend_from_slice(&shift1[32..]);
+
+    let cred = decrypting_oracle(&pasted, &key)?;
+
     println!("{cred:?}");
 
     Ok(())
