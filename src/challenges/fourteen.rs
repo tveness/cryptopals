@@ -173,3 +173,36 @@ pub fn main() -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cracking() {
+        let secret_base_64 = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK";
+        let secret_bytes = general_purpose::STANDARD.decode(secret_base_64).unwrap();
+        let mut rng = rand::thread_rng();
+        // Need a fixed key over the duration
+        let key = random_key(16, &mut rng);
+        let secret_prefix_length = rng.gen::<usize>() % 64_usize;
+        let secret_prefix = random_key(secret_prefix_length, &mut rng);
+        println!("Actual length: {}", secret_prefix_length);
+        let inferred = infer_prefix_length(&secret_prefix, &key).unwrap();
+        println!("Inferred length: {:?}", inferred);
+        // Now add extra padding on top
+        let bs = 16;
+        let mut decrypted_message: Vec<u8> =
+            Vec::with_capacity(oracle(&secret_prefix, b"", &key).unwrap().len());
+        println!("Cracking...");
+
+        while let Ok(next_byte) =
+            get_next_byte(&secret_prefix, inferred, &decrypted_message, &key, bs)
+        {
+            decrypted_message.push(next_byte);
+        }
+        let decrypted_str = std::str::from_utf8(&decrypted_message).unwrap();
+        let secret_str = std::str::from_utf8(&secret_bytes).unwrap();
+        assert_eq!(decrypted_str, secret_str);
+    }
+}
