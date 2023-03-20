@@ -56,10 +56,108 @@
 use crate::utils::*;
 use base64::{engine::general_purpose, Engine as _};
 use rand::seq::SliceRandom;
+use thiserror::Error;
+
+fn oracle(input: &[u8], key: &[u8]) -> Result<()> {
+    match pkcs7_unpad(&cbc_decrypt(input, key, None)?) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e.into()),
+    }
+}
+
+#[derive(Debug, Error)]
+enum CrackingErr {
+    #[error("Error counting up")]
+    AscendingError,
+    #[error("Error counting down")]
+    DescendingError,
+}
+
+// The Asc/Desc is to catch the case when we do get the initial padding right but it is *not* \x01
+// The cracking will eventually fail and we instead sweep from the other direction to not have the
+// same coincidence
+enum Dir {
+    Ascending,
+    Descending,
+}
+
+fn crack_pair(block_pair: &[u8], key: &[u8], dir: Dir) -> Result<Vec<u8>, CrackingErr> {
+    // This is an expansion of the CBC bit-flip attack from before
+    // Instead, the only information we get out is whether or not the padding is correct
+
+    let bs = key.len();
+    // This is the byte from the end we are targetting
+    let mut modified_block = block_pair[bs..].to_vec();
+    modified_block.extend_from_slice(&block_pair[bs..]);
+    for target_byte in 0..bs {
+        let mut b = match dir {
+            Dir::Ascending => 0_u8,
+            Dir::Descending => 255_u8,
+        };
+        modified_block[bs - target_byte - 1] = b;
+        while oracle(&modified_block, key).is_err() {
+            match dir {
+                Dir::Ascending => {
+                    if b == 255 {
+                        return Err(CrackingErr::AscendingError);
+                    }
+                    b += 1
+                }
+                Dir::Descending => {
+                    if b == 0 {
+                        return Err(CrackingErr::DescendingError);
+                    }
+
+                    b -= 1
+                }
+            };
+            modified_block[bs - target_byte - 1] = b;
+        }
+        // Now the padding should be correct ...\xtarget+1\xtarget+1
+        // This implies that decoded[2*bs - target_byte - 1] ^ b = target_byte+1
+        // i.e. decoded[2*bs - target_byte - 1] = b ^(target_byte+1)
+        /*
+        println!(
+            "decoded[{}] = {:?}; b = {}",
+            target_byte,
+            b ^ (target_byte as u8 + 1) ^ block_pair[bs - target_byte - 1],
+            b
+        );
+        */
+        // Now that the padding is correct, we roughly know what is going on
+        // If this is the first byte, then we know the decrypted block ends \x01 (unless we got
+        // lucky and it end \x02\x02, or more, but this is unlikely)
+        // If this is the second byte, it ends \x02 etc
+        // To get the next byte, we now need to make sure all of the bytes we have so far get
+        // updated
+        for update_byte in 0..target_byte + 1 {
+            let loc = bs - update_byte - 1;
+            // When target_byte was 0, intend value was 1
+            let tb = target_byte as u8;
+            //println!("modified_byte was: {}", modified_block[loc]);
+            modified_block[loc] = modified_block[loc] ^ (tb + 1) ^ (tb + 2);
+            //println!("modified_byte now: {}", modified_block[loc]);
+        }
+        //println!();
+    }
+
+    // Now that this is complete, the modified block should now have the following form:
+    // modified_block[..bs] ^ decrypted[bs..] = \xbs+1 ... \xbs+1
+    // => decrypted[bs..] = \xbs+1 .. \xbs+1 ^ modified_block[..bs]
+    // The +1 is because we overdid in on the last round of updating modified_block, where it was
+    // \xbs..\xbs, and took it one step further
+    let decrypted = modified_block[..bs]
+        .iter()
+        .enumerate()
+        .map(|(i, x)| block_pair[i] ^ x ^ ((bs as u8) + 1))
+        .collect();
+    Ok(decrypted)
+}
 
 pub fn main() -> Result<()> {
     let mut rng = rand::thread_rng();
     let key = random_key(16, &mut rng);
+    let bs = key.len();
 
     let base64_secret_strings = vec![
         "MDAwMDAwTm93IHRoYXQgdGhlIHBhcnR5IGlzIGp1bXBpbmc=",
@@ -75,10 +173,43 @@ pub fn main() -> Result<()> {
     ];
     let secret_bytes = base64_secret_strings.choose(&mut rng).unwrap();
     let secret = general_purpose::STANDARD.decode(secret_bytes)?;
-    //let secret_string = std::str::from_utf8(&secret)?;
+    let secret_string = std::str::from_utf8(&secret)?;
 
     let padded = pkcs7_pad(&secret, 16);
-    let ciphertext = cbc_encrypt(&padded, &key, None);
+    let ciphertext = cbc_encrypt(&padded, &key, None)?;
+
+    let mut extended = vec![0_u8; bs];
+    extended.extend_from_slice(&ciphertext);
+    let mut answer = vec![];
+
+    for chunk_num in 0..(extended.len() / bs - 1) {
+        let block_pair = &extended[chunk_num * bs..(chunk_num + 2) * bs];
+        let cracked = match crack_pair(block_pair, &key, Dir::Ascending) {
+            Ok(x) => Ok(x),
+            Err(_) => crack_pair(block_pair, &key, Dir::Descending),
+        }?;
+
+        answer.extend_from_slice(&cracked);
+    }
+
+    let answer = pkcs7_unpad(&answer).unwrap();
+    println!("Cracked:  {:?}", answer);
+    println!("Original: {:?}", secret);
+    println!("Cracked:  {}", std::str::from_utf8(&answer).unwrap());
+    println!("Original: {}", secret_string);
+    assert_eq!(answer, secret);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn repeated_test() {
+        for _ in 0..100 {
+            main().unwrap();
+        }
+    }
 }

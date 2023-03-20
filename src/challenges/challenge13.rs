@@ -119,11 +119,17 @@ pub enum PaddingError {
 pub fn pkcs7_unpad(bytes: &[u8]) -> Result<Vec<u8>, PaddingError> {
     let l = bytes.len();
     let padding_val = bytes[l - 1];
-    let padding = &bytes[l - padding_val as usize..l];
-    let padding_target = vec![padding_val; padding_val as usize];
-    match padding == padding_target {
-        true => Ok(bytes[..l - padding_val as usize].to_vec()),
+    let padding_val_valid = (l >= padding_val as usize) & (0_usize < padding_val as usize);
+    match padding_val_valid {
         false => Err(PaddingError::InvalidPadding),
+        true => {
+            let padding = &bytes[l - padding_val as usize..l];
+            let padding_target = vec![padding_val; padding_val as usize];
+            match padding == padding_target {
+                true => Ok(bytes[..l - padding_val as usize].to_vec()),
+                false => Err(PaddingError::InvalidPadding),
+            }
+        }
     }
 }
 
@@ -195,5 +201,41 @@ mod tests {
         let padded = pkcs7_pad(&bytes, 16);
         let unpadded = pkcs7_unpad(&padded).unwrap();
         assert_eq!(bytes, unpadded);
+    }
+    #[test]
+    #[should_panic]
+    fn test_unpad_invalid_padding() {
+        let bytes: Vec<u8> = vec![1, 2, 3, 4, 5, 6];
+        let mut padded = pkcs7_pad(&bytes, 16);
+        padded[15] = 0;
+        let unpadded = pkcs7_unpad(&padded).unwrap();
+        assert_eq!(bytes, unpadded);
+    }
+    #[test]
+    fn test_unpad_full_pad() {
+        // Full block
+        let bytes: Vec<u8> = vec![6; 16];
+        let padded = pkcs7_pad(&bytes, 16);
+        let unpadded = pkcs7_unpad(&padded).unwrap();
+        assert_eq!(bytes, unpadded);
+    }
+    #[test]
+    fn test_unpad_full_pad_manual() {
+        // Full block
+        let bytes: Vec<u8> = vec![16; 16];
+        let unpadded = pkcs7_unpad(&bytes).unwrap();
+        let unpadded_manual: Vec<u8> = vec![];
+        assert_eq!(unpadded_manual, unpadded);
+    }
+    #[test]
+    fn test_all_pads() {
+        // Full block
+        let mut bytes: Vec<u8> = vec![];
+        for _ in 0..17 {
+            bytes.push(65_u8);
+            let padded = pkcs7_pad(&bytes, 16);
+            let unpadded = pkcs7_unpad(&padded).unwrap();
+            assert_eq!(bytes, unpadded);
+        }
     }
 }
