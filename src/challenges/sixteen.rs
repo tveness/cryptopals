@@ -48,12 +48,12 @@ fn embed(input: &[u8], key: &[u8]) -> Result<Vec<u8>> {
     prepend.extend_from_slice(append);
 
     let padded = pkcs7_pad(&prepend, 16);
-    let enc = cbc_encrypt(&padded, &key, None)?;
+    let enc = cbc_encrypt(&padded, key, None)?;
     Ok(enc)
 }
 
 fn authorise(ciphertext: &[u8], key: &[u8]) -> Result<bool> {
-    let dec = cbc_decrypt(&ciphertext, &key, None)?;
+    let dec = cbc_decrypt(ciphertext, key, None)?;
     let unpadded = pkcs7_unpad(&dec)?;
 
     Ok(contains_admin(&unpadded))
@@ -64,7 +64,38 @@ fn contains_admin(input: &[u8]) -> bool {
     input[..].windows(admin.len()).any(|chunk| chunk == admin)
 }
 
+fn generated_flipped(target: &[u8], key: &[u8]) -> Result<Vec<u8>> {
+    let input = b"aaaaaaaaaaaaaaaa";
+    // |comment1=cooking|%20MCs;userdata=|aaaaaaaaaaaaaaaa|;comment2=%20lik|e%20a%20pound%20|of%20bacon
+    let unmodified = embed(input, key)?;
+    let modified: Vec<u8> = unmodified
+        .iter()
+        .enumerate()
+        .map(|(i, v)| match (16..32).contains(&i) {
+            true => *v ^ target[i - 16] ^ input[i - 16],
+            false => *v,
+        })
+        .collect();
+    Ok(modified)
+}
+
 pub fn main() -> Result<()> {
+    let mut rng = rand::thread_rng();
+    let key = random_key(16, &mut rng);
+
+    let target = b";admin=true;aaaa";
+    let modified = generated_flipped(target, &key)?;
+
+    let target_decrypt = &cbc_decrypt(&modified, &key, None).unwrap()[32..48];
+    let target_str = std::str::from_utf8(target_decrypt).unwrap();
+    println!("Decrypted: {}", target_str);
+
+    let whoami = match authorise(&modified, &key) {
+        Ok(true) => "admin",
+        _ => "not-admin",
+    };
+    println!("whoami: {}", whoami);
+
     Ok(())
 }
 
@@ -78,5 +109,20 @@ mod tests {
 
         assert!(contains_admin(has_admin));
         assert!(!contains_admin(not_has_admin));
+    }
+
+    #[test]
+    fn check_admin_validity() {
+        let mut rng = rand::thread_rng();
+        let key = random_key(16, &mut rng);
+
+        let target = b";admin=true;aaaa";
+        let modified = generated_flipped(target, &key).unwrap();
+
+        let whoami = match authorise(&modified, &key) {
+            Ok(true) => "admin",
+            _ => "not-admin",
+        };
+        assert_eq!("admin", whoami);
     }
 }
