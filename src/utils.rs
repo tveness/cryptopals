@@ -11,7 +11,7 @@ pub use crate::challenges::ten::{cbc_decrypt, cbc_encrypt};
 pub use crate::challenges::ten::{ecb_decrypt, ecb_encrypt};
 pub use crate::challenges::thirteen::{pkcs7_unpad, PaddingError};
 
-use anyhow::Result;
+pub use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
 
 pub fn hex_to_bytes(input: &str) -> Result<Vec<u8>> {
