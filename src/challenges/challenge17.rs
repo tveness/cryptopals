@@ -54,7 +54,31 @@
 //! whether it's padded or not.
 
 use crate::utils::*;
+use base64::{engine::general_purpose, Engine as _};
+use rand::seq::SliceRandom;
 
 pub fn main() -> Result<()> {
+    let mut rng = rand::thread_rng();
+    let key = random_key(16, &mut rng);
+
+    let base64_secret_strings = vec![
+        "MDAwMDAwTm93IHRoYXQgdGhlIHBhcnR5IGlzIGp1bXBpbmc=",
+        "MDAwMDAxV2l0aCB0aGUgYmFzcyBraWNrZWQgaW4gYW5kIHRoZSBWZWdhJ3MgYXJlIHB1bXBpbic=",
+        "MDAwMDAyUXVpY2sgdG8gdGhlIHBvaW50LCB0byB0aGUgcG9pbnQsIG5vIGZha2luZw==",
+        "MDAwMDAzQ29va2luZyBNQydzIGxpa2UgYSBwb3VuZCBvZiBiYWNvbg==",
+        "MDAwMDA0QnVybmluZyAnZW0sIGlmIHlvdSBhaW4ndCBxdWljayBhbmQgbmltYmxl",
+        "MDAwMDA1SSBnbyBjcmF6eSB3aGVuIEkgaGVhciBhIGN5bWJhbA==",
+        "MDAwMDA2QW5kIGEgaGlnaCBoYXQgd2l0aCBhIHNvdXBlZCB1cCB0ZW1wbw==",
+        "MDAwMDA3SSdtIG9uIGEgcm9sbCwgaXQncyB0aW1lIHRvIGdvIHNvbG8=",
+        "MDAwMDA4b2xsaW4nIGluIG15IGZpdmUgcG9pbnQgb2g=",
+        "MDAwMDA5aXRoIG15IHJhZy10b3AgZG93biBzbyBteSBoYWlyIGNhbiBibG93",
+    ];
+    let secret_bytes = base64_secret_strings.choose(&mut rng).unwrap();
+    let secret = general_purpose::STANDARD.decode(secret_bytes)?;
+    //let secret_string = std::str::from_utf8(&secret)?;
+
+    let padded = pkcs7_pad(&secret, 16);
+    let ciphertext = cbc_encrypt(&padded, &key, None);
+
     Ok(())
 }
