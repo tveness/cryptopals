@@ -67,6 +67,11 @@ pub fn crack_single_byte_xor(input_bytes: &[u8], ref_map: &HashMap<char, f64>) -
     let b = best_score.0;
     Ok(b)
 }
+pub fn decode_b64_str(input: &str) -> Result<Vec<u8>> {
+    let res = general_purpose::STANDARD.decode(input)?;
+    Ok(res)
+}
+
 pub fn read_base64_lines(filename: &str) -> Result<Vec<Vec<u8>>> {
     let mut v = vec![];
     let f = File::open(filename)?;
