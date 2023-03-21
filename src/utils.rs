@@ -129,7 +129,8 @@ pub fn kl_divergence<T: Eq + Hash>(p: &HashMap<T, f64>, q: &HashMap<T, f64>) -> 
             let px = p.get(k);
             let qx = q.get(k).unwrap();
             match px {
-                None => 0.0,
+                // Penalise a missing value, but not too much
+                None => 0.1,
                 Some(px_val) => *px_val * ((*px_val + 0.01) / (*qx + 0.01)).ln(),
             }
         })
