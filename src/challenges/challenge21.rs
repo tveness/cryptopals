@@ -20,13 +20,13 @@ const M: u32 = 397;
 const R: u32 = 31;
 const A: u32 = 0x9908B0DF;
 
-const U: u32 = 11;
-const D: u32 = 0xFFFFFFFF;
-const S: u32 = 7;
-const B: u32 = 0x9D2C5680;
-const T: u32 = 15;
-const C: u32 = 0xEFC60000;
-const L: u32 = 18;
+pub const U: u32 = 11;
+pub const D: u32 = 0xFFFFFFFF;
+pub const S: u32 = 7;
+pub const B: u32 = 0x9D2C5680;
+pub const T: u32 = 15;
+pub const C: u32 = 0xEFC60000;
+pub const L: u32 = 18;
 const F: u32 = 1812433253;
 
 const LOWER_MASK: u32 = (1 << R) - 1;
