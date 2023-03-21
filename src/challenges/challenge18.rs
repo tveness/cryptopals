@@ -75,5 +75,16 @@ pub fn main() -> Result<()> {
     let decoded_str = std::str::from_utf8(&decoded).unwrap();
     println!("Decoded: {decoded_str}");
 
+    let target = "Yo, VIP Let's kick it Ice, Ice, baby Ice, Ice, baby ";
+    assert_eq!(target, decoded_str);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn check_decoding() {
+        main().unwrap();
+    }
 }
