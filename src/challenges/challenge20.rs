@@ -63,7 +63,7 @@ pub fn main() -> Result<()> {
         })
         .collect::<Vec<Vec<u8>>>();
     for u in unencrypted.iter() {
-        let s = std::str::from_utf8(&u).unwrap();
+        let s = std::str::from_utf8(u).unwrap();
         println!("Unencrytped: {}", s);
     }
 

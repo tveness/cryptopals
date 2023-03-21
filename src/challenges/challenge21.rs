@@ -31,17 +31,17 @@ const F: u32 = 1812433253;
 
 const LOWER_MASK: u32 = (1 << R) - 1;
 // In this case lowest W bits is all of them
-const UPPER_MASK: u32 = (((1 as u64) << W as u64) - 1 as u64) as u32 & !LOWER_MASK;
+const UPPER_MASK: u32 = ((1_u64 << W as u64) - 1_u64) as u32 & !LOWER_MASK;
 
 const LOWEST_W: u64 = 0xFFFFFFFF;
 
-struct Mt {
+pub struct Mt {
     state: Vec<u32>,
     index: usize,
 }
 
 impl Mt {
-    fn seed(seed: u32) -> Mt {
+    pub fn seed(seed: u32) -> Mt {
         let mut state = vec![0; N as usize];
         state[0] = seed;
 
@@ -65,7 +65,7 @@ impl Mt {
             let x = (self.state[i] & UPPER_MASK) | (self.state[(i + 1) % n] & LOWER_MASK);
             let mut xa = x >> 1;
             if (x % 2) != 0 {
-                xa = xa ^ A;
+                xa ^= A;
             }
             let si = (i + M as usize) % n;
             self.state[i] = self.state[si] ^ xa;
