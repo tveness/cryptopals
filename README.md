@@ -38,7 +38,7 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
 - [ ] Set 4, even more block ciphers
   - ✅ Break "random access read/write" AES CTR
   - ✅ CTR bitflipping
-  - [ ] Recover the key from CBC with IV=Key
+  - ✅ Recover the key from CBC with IV=Key
   - [ ] Implement a SHA-1 keyed MAC
   - [ ] Break a SHA-1 keyed MAC using length extension
   - [ ] Break an MD4 keyed MAC using length extension
