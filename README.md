@@ -8,33 +8,33 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
 
 # Status
 
-- ✅ Set 1, basics
-  - ✅ Convert hex to base64
-  - ✅ Fixed XOR
-  - ✅ Single-byte XOR cipher
-  - ✅ Detect single-character XOR
-  - ✅ Implement repeating-key XOR
-  - ✅ Break repeating-key XOR
-  - ✅ AES in ECB mode
-  - ✅ Detect AES in ECB mode
-- ✅ Set 2, block ciphers
-  - ✅ Implement PKCS#7 padding
-  - ✅ Implement CBC mode
-  - ✅ An ECB/CBC detection oracle
-  - ✅ Byte-at-a-time ECB decryption (Simple)
-  - ✅ ECB cut-and-paste
-  - ✅ Byte-at-a-time ECB decryption (Harder)
-  - ✅ PKCS#7 padding validation
-  - ✅ CBC bitflipping attacks
-- ✅ Set 3, more block ciphers
-  - ✅ The CBC padding oracle
-  - ✅ Implement CTR, the stream cipher mode
-  - ✅ Break fixed-nonce CTR mode using substitutions
-  - ✅ Break fixed-nonce CTR statistically
-  - ✅ Implement the MT19937 Mersenne Twister RNG
-  - ✅ Crack an MT19937 seed
-  - ✅ Clone an MT19937 RNG from its output
-  - ✅ Create the MT19937 stream cipher and break it
+- Set 1, basics
+  -✅ Convert hex to base64
+  -✅ Fixed XOR
+  -✅ Single-byte XOR cipher
+  -✅ Detect single-character XOR
+  -✅ Implement repeating-key XOR
+  -✅ Break repeating-key XOR
+  -✅ AES in ECB mode
+  -✅ Detect AES in ECB mode
+- Set 2, block ciphers
+  -✅ Implement PKCS#7 padding
+  -✅ Implement CBC mode
+  -✅ An ECB/CBC detection oracle
+  -✅ Byte-at-a-time ECB decryption (Simple)
+  -✅ ECB cut-and-paste
+  -✅ Byte-at-a-time ECB decryption (Harder)
+  -✅ PKCS#7 padding validation
+  -✅ CBC bitflipping attacks
+- Set 3, more block ciphers
+  -✅ The CBC padding oracle
+  -✅ Implement CTR, the stream cipher mode
+  -✅ Break fixed-nonce CTR mode using substitutions
+  -✅ Break fixed-nonce CTR statistically
+  -✅ Implement the MT19937 Mersenne Twister RNG
+  -✅ Crack an MT19937 seed
+  -✅ Clone an MT19937 RNG from its output
+  -✅ Create the MT19937 stream cipher and break it
 - [ ] Set 4, even more block ciphers
   - [ ] Break "random access read/write" AES CTR
   - [ ] CTR bitflipping
