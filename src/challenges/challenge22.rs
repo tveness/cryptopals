@@ -22,7 +22,7 @@ use chrono::Utc;
 pub fn main() -> Result<()> {
     let mut rng = thread_rng();
 
-    let random_offset = rng.gen::<i64>() % 1000;
+    let random_offset = (rng.gen::<u64>() % 1000) as i64;
     let offset_timestamp = Utc::now().timestamp() - random_offset;
     let mut mt = Mt::seed(offset_timestamp as u32);
 
@@ -32,6 +32,9 @@ pub fn main() -> Result<()> {
     let mut back_count = 0;
     while Mt::seed((now - back_count) as u32).next() != first_byte {
         back_count += 1;
+        if back_count > 1000 {
+            panic!("Missed the answer {random_offset}");
+        }
     }
 
     println!("Cracked offset: {back_count}");

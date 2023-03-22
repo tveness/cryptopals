@@ -33,11 +33,11 @@ const LOWER_MASK: u32 = (1 << R) - 1;
 // In this case lowest W bits is all of them
 const UPPER_MASK: u32 = ((1_u64 << W as u64) - 1_u64) as u32 & !LOWER_MASK;
 
-const LOWEST_W: u64 = 0xFFFFFFFF;
+pub const LOWEST_W: u64 = 0xFFFFFFFF;
 
 pub struct Mt {
-    state: Vec<u32>,
-    index: usize,
+    pub state: Vec<u32>,
+    pub index: usize,
 }
 
 impl Mt {
