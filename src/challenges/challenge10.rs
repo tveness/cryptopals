@@ -37,7 +37,11 @@ pub fn main() -> Result<()> {
     Ok(())
 }
 
-pub fn cbc_decrypt(ciphertext: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<Vec<u8>> {
+pub fn cbc_decrypt(
+    ciphertext: &[u8],
+    key: &[u8],
+    iv: Option<&[u8]>,
+) -> Result<Vec<u8>, openssl::error::ErrorStack> {
     let mut decrypted = vec![];
     let mut iv = match iv {
         None => vec![0; key.len()],
@@ -76,7 +80,11 @@ pub fn cbc_decrypt(ciphertext: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<V
     Ok(decrypted)
 }
 
-pub fn cbc_encrypt(plaintext: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<Vec<u8>> {
+pub fn cbc_encrypt(
+    plaintext: &[u8],
+    key: &[u8],
+    iv: Option<&[u8]>,
+) -> Result<Vec<u8>, openssl::error::ErrorStack> {
     let mut encrypted = vec![];
     let mut iv = match iv {
         None => vec![0; key.len()],
