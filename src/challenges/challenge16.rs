@@ -59,7 +59,7 @@ fn authorise(ciphertext: &[u8], key: &[u8]) -> Result<bool> {
     Ok(contains_admin(&unpadded))
 }
 
-fn contains_admin(input: &[u8]) -> bool {
+pub fn contains_admin(input: &[u8]) -> bool {
     let admin = b";admin=true;";
     input[..].windows(admin.len()).any(|chunk| chunk == admin)
 }
