@@ -115,7 +115,7 @@ pub fn main() -> Result<()> {
     let random_seed = rng.gen::<u32>();
     let mt = Mt::seed(random_seed);
 
-    let untempered_state = mt.take(624).map(|x| untemper(x)).collect::<Vec<u32>>();
+    let untempered_state = mt.take(624).map(untemper).collect::<Vec<u32>>();
 
     let mt_spliced = Mt {
         state: untempered_state,
