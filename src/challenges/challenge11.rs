@@ -76,7 +76,7 @@ pub fn random_key(l: usize, rng: &mut ThreadRng) -> Vec<u8> {
     v
 }
 
-fn random_bytes(a: usize, b: usize, rng: &mut ThreadRng) -> Vec<u8> {
+pub fn random_bytes(a: usize, b: usize, rng: &mut ThreadRng) -> Vec<u8> {
     let len: usize = a + rng.gen::<usize>() % (b - a);
     let mut v = vec![0; len];
     rng.fill(&mut v[..len]);

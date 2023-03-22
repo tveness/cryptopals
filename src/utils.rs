@@ -8,7 +8,7 @@ pub use crate::challenges::challenge08::is_unique;
 pub use crate::challenges::challenge09::pkcs7_pad;
 pub use crate::challenges::challenge10::{cbc_decrypt, cbc_encrypt};
 pub use crate::challenges::challenge10::{ecb_decrypt, ecb_encrypt};
-pub use crate::challenges::challenge11::{detect_mode, random_key, Mode};
+pub use crate::challenges::challenge11::{detect_mode, random_bytes, random_key, Mode};
 pub use crate::challenges::challenge13::{pkcs7_unpad, PaddingError};
 pub use crate::challenges::challenge21::Mt;
 
