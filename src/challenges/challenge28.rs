@@ -13,6 +13,8 @@
 //! Verify that you cannot tamper with the message without breaking the MAC you've produced, and
 //! that you can't produce a new MAC without knowing the secret key.
 
+use rand::thread_rng;
+
 use crate::utils::*;
 
 struct Sha1Hasher {
@@ -211,16 +213,52 @@ fn u8s_to_u32(input: &[u8]) -> u32 {
         .sum()
 }
 
-pub fn main() -> Result<()> {
-    //let a = b"The quick brown fox jumps over the lazy dog";
-    let a = b"";
-    //let a = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+fn mac(key: &[u8], message: &[u8]) -> Vec<u8> {
+    let mut a = vec![];
+    a.extend_from_slice(key);
+    a.extend_from_slice(message);
 
     let mut hasher = Sha1Hasher::default();
-    let h = hasher.hash(a);
-    let hex = bytes_to_hex(&h);
-    println!("hex: {hex}");
+    hasher.hash(&a)
+}
 
+#[derive(Debug)]
+enum Auth {
+    Valid,
+    Invalid,
+}
+
+fn authenticate(key: &[u8], message: &[u8], m: &[u8]) -> Auth {
+    match m == &mac(key, message)[..] {
+        true => Auth::Valid,
+        false => Auth::Invalid,
+    }
+}
+
+pub fn main() -> Result<()> {
+    let mut rng = thread_rng();
+    let key = random_key(16, &mut rng);
+    let message = b"super secret test message";
+
+    let m = mac(&key, message);
+
+    println!("Generate message and MAC");
+    println!("Authenticate MAC: {:?}", authenticate(&key, message, &m));
+
+    println!("Modify message");
+    let message_mod = b"supeR secret test message";
+    println!(
+        "Authenticate MAC: {:?}",
+        authenticate(&key, message_mod, &m)
+    );
+
+    println!("Modify MAC");
+    let mut m_mod = m;
+    m_mod[5] = 2;
+    println!(
+        "Authenticate MAC: {:?}",
+        authenticate(&key, message, &m_mod)
+    );
     Ok(())
 }
 
