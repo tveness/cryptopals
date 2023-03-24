@@ -21,9 +21,9 @@ struct Md4Hasher {
 }
 
 impl Md4Hasher {
-    pub fn hash(&mut self, data: &[u8]) -> Vec<u8> {
-        let mut data = data.to_vec();
+    fn prepare(data: &[u8], bogus_ml: usize) -> Vec<u8> {
         let ml = data.len();
+        let mut data = data.to_vec();
         // Want to pad so there are 64 bits left over
         // Modulo is how much room there is
         let modulo = 64 - ml % 64;
@@ -46,12 +46,24 @@ impl Md4Hasher {
         data.extend_from_slice(&vec![0; pl - 1]);
 
         // Append length
-        let le: Vec<u8> = u32_to_u8s(8 * ml as u32).iter().map(|x| *x).rev().collect();
+        let le: Vec<u8> = u32_to_u8s(8 * bogus_ml as u32)
+            .iter()
+            .map(|x| *x)
+            .rev()
+            .collect();
         data.extend_from_slice(&le);
         data.extend_from_slice(&vec![0, 0, 0, 0]);
 
         assert_eq!(data.len() % 64, 0);
+        data
+    }
 
+    pub fn hash(&mut self, data: &[u8]) -> Vec<u8> {
+        let data = Self::prepare(data, data.len());
+
+        self.process(&data)
+    }
+    pub fn process(&mut self, data: &[u8]) -> Vec<u8> {
         let m: Vec<u32> = data
             .chunks(4)
             .map(|x| {
@@ -157,6 +169,22 @@ impl Md4Hasher {
             d: 0x10325476,
         }
     }
+
+    pub fn load(digest: &[u8]) -> Self {
+        let c: Vec<u32> = digest.chunks(4).map(u8s_to_u32_le).collect();
+        if let &[a, b, c, d] = &c[..] {
+            Self { a, b, c, d }
+        } else {
+            panic!("Invalid digest");
+        }
+    }
+}
+
+fn u8s_to_u32_le(b: &[u8]) -> u32 {
+    b.iter()
+        .enumerate()
+        .map(|(i, v)| (*v as u32) << (i * 8))
+        .sum()
 }
 
 pub fn main() -> Result<()> {
@@ -178,6 +206,15 @@ fn hash(b: &[u8]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn test_laod() {
+        // From RFC
+        let h = hex_to_bytes("31d6cfe0d16ae931b73c59d7e0c089c0").unwrap();
+        let b = b"";
+        let loader = hex_to_bytes("0123456789abcdeffedcba9876543210").unwrap();
+        let mut hasher = Md4Hasher::load(&loader);
+        assert_eq!(h, hasher.hash(b));
+    }
 
     #[test]
     fn test_hashes() {
