@@ -112,7 +112,7 @@ impl Sha1Hasher {
             w.extend_from_slice(&extender);
 
             for i in 16..80 {
-                w[i] = Self::lr(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
+                w[i] = (w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]).rotate_left(1);
             }
 
             let mut a = self.h0;
@@ -132,31 +132,22 @@ impl Sha1Hasher {
                 //let f = (b & c) | ((!b) & d);
                 //let k = 0x5a827999_u32;
 
-                //                let k = k as u64;
-                let temp: u64 = [
-                    Self::lr(a, 5) as u64,
-                    f as u64,
-                    e as u64,
-                    w[t] as u64,
-                    k as u64,
-                ]
-                .iter()
-                .sum();
-                let temp = (temp & 0xffffffff) as u32;
-                //let temp = (temp % std::u32::MAX as u64) as u32;
+                let temp: u32 = [a.rotate_left(5), f, e, w[t], k]
+                    .iter()
+                    .fold(0, |acc, x| acc.wrapping_add(*x));
 
                 e = d;
                 d = c;
-                c = Self::lr(b, 30);
+                c = b.rotate_left(30);
                 b = a;
                 a = temp;
                 //println!("t= {t:02} {a:08x} {b:08x} {c:08x} {d:08x} {e:08x}");
             }
-            self.h0 = (((self.h0 as u64) + (a as u64)) & 0xffffffff) as u32;
-            self.h1 = (((self.h1 as u64) + (b as u64)) & 0xffffffff) as u32;
-            self.h2 = (((self.h2 as u64) + (c as u64)) & 0xffffffff) as u32;
-            self.h3 = (((self.h3 as u64) + (d as u64)) & 0xffffffff) as u32;
-            self.h4 = (((self.h4 as u64) + (e as u64)) & 0xffffffff) as u32;
+            self.h0 = self.h0.wrapping_add(a);
+            self.h1 = self.h1.wrapping_add(b);
+            self.h2 = self.h2.wrapping_add(c);
+            self.h3 = self.h3.wrapping_add(d);
+            self.h4 = self.h4.wrapping_add(e);
             /*
             println!("H[0] = {:x}", self.h0);
             println!("H[1] = {:x}", self.h1);
@@ -179,18 +170,6 @@ impl Sha1Hasher {
         hh.extend_from_slice(&h3bits);
         hh.extend_from_slice(&h4bits);
         hh
-    }
-
-    fn lr(val: u32, amount: u32) -> u32 {
-        //let lower_mask = (1 << (32 - amount)) - 1;
-        //println!("Lower mask: {lower_mask:x}");
-        //let upper_mask = !lower_mask;
-        //println!("Upper mask: {upper_mask:x}");
-        //((val & lower_mask) << amount) | ((val & upper_mask) >> (32 - amount))
-        let val = val as u64;
-        let lr = (val << amount) | (val >> (32 - amount));
-
-        (lr & 0xffffffff) as u32
     }
 }
 
@@ -260,13 +239,6 @@ pub fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn lrotate_test() {
-        assert_eq!(Sha1Hasher::lr(0x0000ffff, 8), 0x00ffff00);
-        assert_eq!(Sha1Hasher::lr(0x00ffff00, 8), 0xffff0000);
-        assert_eq!(Sha1Hasher::lr(0xabcd0000, 8), 0xcd0000ab);
-    }
 
     #[test]
     fn sha1test() {
