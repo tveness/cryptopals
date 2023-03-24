@@ -194,13 +194,13 @@ impl Sha1Hasher {
     }
 }
 
-fn u32_to_u8s(input: u32) -> Vec<u8> {
+pub fn u32_to_u8s(input: u32) -> Vec<u8> {
     (0..4)
         .map(|i| ((input >> ((3 - i) * 8)) & 0xff) as u8)
         .collect()
 }
 
-fn u8s_to_u32(input: &[u8]) -> u32 {
+pub fn u8s_to_u32(input: &[u8]) -> u32 {
     input
         .iter()
         .enumerate()
