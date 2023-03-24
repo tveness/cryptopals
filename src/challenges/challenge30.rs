@@ -9,6 +9,8 @@
 //!     MAC with SHA1. Which meant that SHA1 code was floating all over the Internet. MD4 code, not so
 //!     much.
 
+use rand::thread_rng;
+
 use crate::utils::*;
 
 /// MD4 implementation according to RFC1186
@@ -41,18 +43,18 @@ impl Md4Hasher {
         assert_eq!(remainder, 64 - 8);
 
         // Add 1 bit
-        data.extend_from_slice(&vec![0x80]);
+        data.extend_from_slice(&[0x80]);
         // Add rest of padding
         data.extend_from_slice(&vec![0; pl - 1]);
 
         // Append length
         let le: Vec<u8> = u32_to_u8s(8 * bogus_ml as u32)
             .iter()
-            .map(|x| *x)
+            .copied()
             .rev()
             .collect();
         data.extend_from_slice(&le);
-        data.extend_from_slice(&vec![0, 0, 0, 0]);
+        data.extend_from_slice(&[0, 0, 0, 0]);
 
         assert_eq!(data.len() % 64, 0);
         data
@@ -72,7 +74,7 @@ impl Md4Hasher {
         let m: Vec<u32> = data
             .chunks(4)
             .map(|x| {
-                let y: Vec<u8> = x.iter().map(|x| *x).rev().collect();
+                let y: Vec<u8> = x.iter().copied().rev().collect();
                 u8s_to_u32(&y)
             })
             .collect();
@@ -132,10 +134,10 @@ impl Md4Hasher {
             self.c = self.c.wrapping_add(c);
             self.d = self.d.wrapping_add(d);
         }
-        let ab: Vec<u8> = u32_to_u8s(self.a).iter().map(|x| *x).rev().collect();
-        let bb: Vec<u8> = u32_to_u8s(self.b).iter().map(|x| *x).rev().collect();
-        let cb: Vec<u8> = u32_to_u8s(self.c).iter().map(|x| *x).rev().collect();
-        let db: Vec<u8> = u32_to_u8s(self.d).iter().map(|x| *x).rev().collect();
+        let ab: Vec<u8> = u32_to_u8s(self.a).iter().copied().rev().collect();
+        let bb: Vec<u8> = u32_to_u8s(self.b).iter().copied().rev().collect();
+        let cb: Vec<u8> = u32_to_u8s(self.c).iter().copied().rev().collect();
+        let db: Vec<u8> = u32_to_u8s(self.d).iter().copied().rev().collect();
 
         let mut result = vec![];
         result.extend_from_slice(&ab);
@@ -192,20 +194,81 @@ fn u8s_to_u32_le(b: &[u8]) -> u32 {
         .sum()
 }
 
-pub fn main() -> Result<()> {
-    let mut h = Md4Hasher::new();
-    let dat = b"";
-
-    let digest = h.hash(dat);
-    println!("Digest:     {}", bytes_to_hex(&digest));
-    println!("MD4 ('a') = bde52cb31de33e46245e05fbdbd6fb24 ");
-
-    Ok(())
+fn md4_auth(key: &[u8], message: &[u8], mac: &[u8]) -> Auth {
+    let mut hasher = Md4Hasher::new();
+    let mut mes = key.to_vec();
+    mes.extend_from_slice(message);
+    let h = hasher.hash(&mes);
+    match h == mac {
+        true => Auth::Valid,
+        false => Auth::Invalid,
+    }
 }
 
-fn hash(b: &[u8]) -> Vec<u8> {
-    let mut h = Md4Hasher::new();
-    h.hash(b)
+pub fn main() -> Result<()> {
+    let mut rng = thread_rng();
+    let key = random_key(16, &mut rng);
+    let base_message =
+        b"comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon";
+
+    let mut message = key.clone();
+    message.extend_from_slice(base_message);
+
+    let mut hasher = Md4Hasher::new();
+    let mac = hasher.hash(&message);
+    let auth = md4_auth(&key, base_message, &mac);
+    println!("Original message authentication: {:?}", auth);
+
+    // Now to extend!
+    let mut new_mac = mac.clone();
+    let mut key_len = 0;
+    let addition = b";admin=true;";
+    let mut new_message: Vec<u8> = vec![];
+    let bml = base_message.len() as u64;
+    while md4_auth(&key, &new_message, &new_mac) != Auth::Valid {
+        key_len += 1;
+        // What's the idea? We want to take the original mac and start the hasher from this state
+        // 1. Set initial hashing values from what we had before
+        // and run from this
+        let mut cont_hasher = Md4Hasher::load(&mac);
+        // This should be the state of the hasher after working through
+        // |key||message||    glue     ||
+        // The new mac must account for extra padding
+        // The message length must be that of the original padded message + addition
+        let mut fake_start = vec![0; key_len];
+        fake_start.extend_from_slice(base_message);
+        let glue =
+            &Md4Hasher::prepare(&fake_start, fake_start.len())[(key_len + base_message.len()..)];
+
+        let total_new_l = glue.len() + key_len + bml as usize + addition.len();
+
+        new_mac = cont_hasher.bogus_hash(addition, total_new_l);
+        // We now add addition into this, which should be the hash of
+        // |key||message||    glue     || addition || (implied glue)
+
+        // This new_mac therefore corresponds to the mac of
+        // | message || glue || addition
+        // Which we should now construct as our new message
+        new_message = base_message.to_vec();
+
+        new_message.extend_from_slice(glue);
+
+        new_message.extend_from_slice(addition);
+        //println!("New message:      {}", bytes_to_hex(&new_message));
+
+        // This padded version should be a multiple of 64 + new_message
+        //println!("New message len + key_len: {}", new_message.len() + key_len);
+    }
+
+    println!("Key length: {}", key_len);
+    println!("Original message: {}", bytes_to_hex(base_message));
+    println!("New message:      {}", bytes_to_hex(&new_message));
+    println!("New mac: {}", bytes_to_hex(&new_mac));
+
+    let auth = md4_auth(&key, &new_message, &new_mac);
+    println!("Authentication status: {:?}", auth);
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -275,5 +338,10 @@ mod tests {
         let h = hex_to_bytes("e33b4ddc9c38f2199c3e7b164fcc0536").unwrap();
         let b = b"12345678901234567890123456789012345678901234567890123456789012345678901234567890";
         assert_eq!(h, hash(b));
+    }
+
+    fn hash(b: &[u8]) -> Vec<u8> {
+        let mut h = Md4Hasher::new();
+        h.hash(b)
     }
 }
