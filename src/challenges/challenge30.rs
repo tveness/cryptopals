@@ -21,7 +21,7 @@ struct Md4Hasher {
 }
 
 impl Md4Hasher {
-    fn prepare(data: &[u8], bogus_ml: usize) -> Vec<u8> {
+    pub fn prepare(data: &[u8], bogus_ml: usize) -> Vec<u8> {
         let ml = data.len();
         let mut data = data.to_vec();
         // Want to pad so there are 64 bits left over
@@ -56,6 +56,11 @@ impl Md4Hasher {
 
         assert_eq!(data.len() % 64, 0);
         data
+    }
+    pub fn bogus_hash(&mut self, data: &[u8], ml: usize) -> Vec<u8> {
+        let data = Self::prepare(data, ml);
+
+        self.process(&data)
     }
 
     pub fn hash(&mut self, data: &[u8]) -> Vec<u8> {
@@ -214,6 +219,30 @@ mod tests {
         let loader = hex_to_bytes("0123456789abcdeffedcba9876543210").unwrap();
         let mut hasher = Md4Hasher::load(&loader);
         assert_eq!(h, hasher.hash(b));
+    }
+
+    #[test]
+    fn extension_check() {
+        let message = b"abc";
+        let mut hasher = Md4Hasher::new();
+        let mac = hasher.hash(message);
+
+        let extension = b"defg";
+        let mut e_hasher = Md4Hasher::load(&mac);
+        // Need to modify this hasing function to do the padding correctly
+        let original_padding_l = Md4Hasher::prepare(message, message.len()).len();
+        let e_mac = e_hasher.bogus_hash(extension, original_padding_l + extension.len());
+
+        let mut manual_extension: Vec<u8> = Md4Hasher::prepare(message, message.len());
+        manual_extension.extend_from_slice(extension);
+
+        let mut m_hasher = Md4Hasher::new();
+        let me_mac = m_hasher.hash(&manual_extension);
+
+        println!("emac: {}", bytes_to_hex(&e_mac));
+        println!("mmac: {}", bytes_to_hex(&me_mac));
+
+        assert_eq!(e_mac, me_mac);
     }
 
     #[test]

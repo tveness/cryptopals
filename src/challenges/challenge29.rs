@@ -146,8 +146,6 @@ fn sha1padding(ml: u64) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
-    use openssl::sha::sha1;
-
     use super::*;
 
     #[test]
