@@ -63,7 +63,7 @@ pub fn main() -> Result<()> {
     println!("Original message authentication: {:?}", auth);
 
     // Now to extend!
-    let mut new_mac = mac.clone();
+    let mut new_mac = vec![];
     let mut key_len = 0;
     let addition = b";admin=true;";
     let mut new_message: Vec<u8> = vec![];

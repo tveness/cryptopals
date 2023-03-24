@@ -220,7 +220,7 @@ pub fn main() -> Result<()> {
     println!("Original message authentication: {:?}", auth);
 
     // Now to extend!
-    let mut new_mac = mac.clone();
+    let mut new_mac = vec![];
     let mut key_len = 0;
     let addition = b";admin=true;";
     let mut new_message: Vec<u8> = vec![];
@@ -238,7 +238,7 @@ pub fn main() -> Result<()> {
         let mut fake_start = vec![0; key_len];
         fake_start.extend_from_slice(base_message);
         let glue =
-            &Md4Hasher::prepare(&fake_start, fake_start.len())[(key_len + base_message.len()..)];
+            &Md4Hasher::prepare(&fake_start, fake_start.len())[key_len + base_message.len()..];
 
         let total_new_l = glue.len() + key_len + bml as usize + addition.len();
 
