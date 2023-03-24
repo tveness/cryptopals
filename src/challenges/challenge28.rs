@@ -17,7 +17,7 @@ use rand::thread_rng;
 
 use crate::utils::*;
 
-struct Sha1Hasher {
+pub struct Sha1Hasher {
     h0: u32,
     h1: u32,
     h2: u32,
@@ -40,16 +40,7 @@ impl Default for Sha1Hasher {
 impl Sha1Hasher {
     pub fn load(hash: &[u8]) -> Self {
         // Beautiful, what could go wrong?
-        if let &[h0, h1, h2, h3, h4] = &hash
-            .chunks(4)
-            .map(|c| {
-                c.iter()
-                    .enumerate()
-                    .map(|(i, v)| (*v as u32) << (8 * (3 - i)))
-                    .sum()
-            })
-            .collect::<Vec<u32>>()[..]
-        {
+        if let &[h0, h1, h2, h3, h4] = &hash.chunks(4).map(u8s_to_u32).collect::<Vec<u32>>()[..] {
             Sha1Hasher { h0, h1, h2, h3, h4 }
         } else {
             panic!("Invalid hash");
@@ -61,10 +52,13 @@ impl Sha1Hasher {
     ///
     /// Example and intermediate values at
     /// https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/SHA1.pdf
-    pub fn hash(&mut self, data: &[u8]) -> Vec<u8> {
+    pub fn hash(&mut self, data: &[u8], data_length: Option<usize>) -> Vec<u8> {
         // Pre-process
         let mut data: Vec<u8> = data.to_vec();
-        let ml = data.len() as u64;
+        let ml = match data_length {
+            None => data.len() as u64,
+            Some(x) => x as u64,
+        };
         // Add 1 bit
         data.push(0x80);
         // Number of bits left to pad
@@ -90,6 +84,7 @@ impl Sha1Hasher {
         //println!("dl: {}", data.len() * 8);
 
         assert_eq!((data.len() * 8) % 512, 0);
+        //println!("Padded:           {}", bytes_to_hex(&data));
 
         /*
         println!("==Initial hash values==");
@@ -219,16 +214,16 @@ fn mac(key: &[u8], message: &[u8]) -> Vec<u8> {
     a.extend_from_slice(message);
 
     let mut hasher = Sha1Hasher::default();
-    hasher.hash(&a)
+    hasher.hash(&a, None)
 }
 
-#[derive(Debug)]
-enum Auth {
+#[derive(Debug, PartialEq)]
+pub enum Auth {
     Valid,
     Invalid,
 }
 
-fn authenticate(key: &[u8], message: &[u8], m: &[u8]) -> Auth {
+pub fn authenticate(key: &[u8], message: &[u8], m: &[u8]) -> Auth {
     match m == &mac(key, message)[..] {
         true => Auth::Valid,
         false => Auth::Invalid,
@@ -286,11 +281,25 @@ mod tests {
             println!("input: {s}");
             println!("expected output: {b}");
             let mut hasher = Sha1Hasher::default();
-            let h = hasher.hash(s.as_bytes());
+            let h = hasher.hash(s.as_bytes(), None);
             let output_text = bytes_to_hex(&h);
             println!("actual output: {}", output_text);
             let output_bytes = hex_to_bytes(b).unwrap();
             assert_eq!(h, output_bytes);
         }
+    }
+
+    #[test]
+    fn check_loader() {
+        let mut hasher = Sha1Hasher::default();
+        let h = hasher.hash(b"abc", None);
+
+        let default_hashes = [
+            0x67, 0x45, 0x23, 0x01, 0xEF, 0xCD, 0xAB, 0x89, 0x98, 0xBA, 0xDC, 0xFE, 0x10, 0x32,
+            0x54, 0x76, 0xC3, 0xD2, 0xE1, 0xF0,
+        ];
+        let mut loaded_hasher = Sha1Hasher::load(&default_hashes);
+        let hl = loaded_hasher.hash(b"abc", None);
+        assert_eq!(h, hl);
     }
 }
