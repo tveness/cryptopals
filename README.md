@@ -40,11 +40,19 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
   - ✅ CTR bitflipping
   - ✅ Recover the key from CBC with IV=Key
   - ✅ Implement a SHA-1 keyed MAC
-  - ✅  Break a SHA-1 keyed MAC using length extension
+  - ✅ Break a SHA-1 keyed MAC using length extension
   - ✅ Break an MD4 keyed MAC using length extension
-  - [ ] Implement and break HMAC-SHA1 with an artificial timing leak
-  - [ ] Break HMAC-SHA1 with a slightly less artificial timing leak
-
+  - ✅ Implement and break HMAC-SHA1 with an artificial timing leak
+  - ✅ Break HMAC-SHA1 with a slightly less artificial timing leak
+- [ ] Set 5, Diffie-Hellmann and friends
+  - [ ] Implement Diffie-Hellman
+  - [ ] Implement a MITM key-fixing attack on Diffie-Hellman with parameter injection
+  - [ ] Implement DH with negotiated groups, and break with malicious "g" parameters
+  - [ ] Implement Secure Remote Password (SRP)
+  - [ ] Break SRP with a zero key
+  - [ ] Offline dictionary attack on simplified SRP
+  - [ ] Implement RSA
+  - [ ] Implement an E=3 RSA Broadcast attack
 
 # Build
 
