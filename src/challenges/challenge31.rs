@@ -30,7 +30,7 @@
 //! keeping things cryptographic in these challenges.
 
 use itertools::Itertools;
-use std::{sync::mpsc::channel, thread, time::Duration};
+use std::time::Duration;
 
 use chrono::Utc;
 use rand::thread_rng;
@@ -76,7 +76,7 @@ fn kprime(key: &[u8]) -> Vec<u8> {
 
 fn insecure_compare(file: &[u8], hmac: &[u8], key: &[u8]) -> Auth {
     let true_hmac = sha1_hmac(key, file);
-    let delay = 5;
+    let delay = 10;
     for (i, v) in true_hmac.iter().enumerate() {
         if hmac[i] != *v {
             return Auth::Invalid;
@@ -87,60 +87,51 @@ fn insecure_compare(file: &[u8], hmac: &[u8], key: &[u8]) -> Auth {
 }
 
 pub fn main() -> Result<()> {
-    let (tx, rx) = channel::<Vec<u8>>();
-    let (tx2, rx2) = channel::<Auth>();
+    let mut rng = thread_rng();
+    let key = random_key(16, &mut rng);
+    let h = sha1_hmac(&key, b"file");
 
-    let handle = thread::spawn(move || {
-        let mut rng = thread_rng();
-        let key = random_key(16, &mut rng);
-        let h = sha1_hmac(&key, b"file");
-        println!("True hmac: {}", bytes_to_hex(&h));
-        for received in rx {
-            match insecure_compare(b"file", &received, &key) {
-                Auth::Valid => {
-                    tx2.send(Auth::Valid).unwrap();
-                    return ();
-                }
-                Auth::Invalid => tx2.send(Auth::Invalid).unwrap(),
-            };
-        }
-    });
-
+    println!("This one can take quite a while to run!");
     let mut guess: Vec<u8> = vec![0; 20];
 
     for i in 0..guess.len() {
-        println!("Guess:     {}", bytes_to_hex(&guess[..i]));
-        let b = (0..255_u8)
-            .map(|x| {
-                guess[i] = x;
-                let mut d = vec![];
+        println!("True:  {}", bytes_to_hex(&h));
+        let mut bs = vec![];
+        for _ in 0..5 {
+            let b = (0..255_u8)
+                .map(|x| {
+                    guess[i] = x;
 
-                for _ in 0..5 {
-                    tx.send(guess.to_vec()).unwrap();
                     let start = Utc::now();
-                    let r = rx2.recv().unwrap();
-                    let stop = Utc::now();
-
-                    match r {
+                    match insecure_compare(b"file", &guess, &key) {
                         Auth::Valid => println!("Guess is valid!"),
                         Auth::Invalid => {}
                     };
-                    d.push((stop - start).num_milliseconds());
-                }
-                //println!("Byte: {}, delay: {}", x, d);
-                d.sort();
-                d[d.len() / 2]
-            })
-            .position_max()
-            .unwrap();
-        guess[i] = b as u8;
-    }
-    drop(tx);
-    drop(rx2);
-    println!("Guess:     {}", bytes_to_hex(&guess));
+                    let stop = Utc::now();
 
-    handle.join().unwrap();
+                    let d = (stop - start).num_microseconds().unwrap();
+                    (x, d)
+                })
+                .collect::<Vec<(u8, i64)>>();
+            bs.extend_from_slice(&b);
+        }
+        let b = get_max_b(&bs);
+
+        guess[i] = b;
+        println!("Guess: {}", bytes_to_hex(&guess[..i]));
+    }
+    println!("Guess: {}", bytes_to_hex(&guess));
+    assert_eq!(h, guess);
+
     Ok(())
+}
+
+fn get_max_b(b: &[(u8, i64)]) -> u8 {
+    let mut results = vec![0; b.len()];
+    for (v, t) in b {
+        results[*v as usize] += *t;
+    }
+    results.iter().position_max().unwrap() as u8
 }
 
 #[cfg(test)]
