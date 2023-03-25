@@ -35,7 +35,7 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
   - ✅ Crack an MT19937 seed
   - ✅ Clone an MT19937 RNG from its output
   - ✅ Create the MT19937 stream cipher and break it
-- [ ] Set 4, even more block ciphers
+- ✅ Set 4, even more block ciphers
   - ✅ Break "random access read/write" AES CTR
   - ✅ CTR bitflipping
   - ✅ Recover the key from CBC with IV=Key
