@@ -30,3 +30,4 @@ pub mod challenge29;
 pub mod challenge30;
 pub mod challenge31;
 pub mod challenge32;
+pub mod challenge33;
