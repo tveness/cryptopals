@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use clap::Parser;
 
 mod challenges;
+mod dh;
 mod stream;
 mod utils;
 
@@ -49,6 +50,7 @@ fn main() -> Result<()> {
         31 => challenges::challenge31::main(),
         32 => challenges::challenge32::main(),
         33 => challenges::challenge33::main(),
+        34 => challenges::challenge34::main(),
         _ => Err(anyhow!("Invalid challenge number")),
     }?;
     Ok(())
