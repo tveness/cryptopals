@@ -29,7 +29,9 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
   - ✅ Byte-at-a-time ECB decryption (Harder)
   - ✅ PKCS#7 padding validation
   - ✅ CBC bitflipping attacks
-- ✅ Set 3, more block ciphers
+</details>
+<details>
+<summary>✅ Set 3, more block ciphers</summary>
   - ✅ The CBC padding oracle
   - ✅ Implement CTR, the stream cipher mode
   - ✅ Break fixed-nonce CTR mode using substitutions
@@ -50,6 +52,7 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
   - ✅ Implement and break HMAC-SHA1 with an artificial timing leak
   - ✅ Break HMAC-SHA1 with a slightly less artificial timing leak
 </details>
+
 - [ ] Set 5, Diffie-Hellmann and friends
   - ✅ Implement Diffie-Hellman
   - ✅ Implement a MITM key-fixing attack on Diffie-Hellman with parameter
