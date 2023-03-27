@@ -10,6 +10,7 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
 
 <details>
 <summary>✅ Set 1, basics</summary>
+
   - ✅ Convert hex to base64
   - ✅ Fixed XOR
   - ✅ Single-byte XOR cipher
@@ -21,6 +22,7 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
 </details>
 <details>
 <summary>✅ Set 2, block ciphers</summary>
+
   - ✅ Implement PKCS#7 padding
   - ✅ Implement CBC mode
   - ✅ An ECB/CBC detection oracle
@@ -32,6 +34,7 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
 </details>
 <details>
 <summary>✅ Set 3, more block ciphers</summary>
+
   - ✅ The CBC padding oracle
   - ✅ Implement CTR, the stream cipher mode
   - ✅ Break fixed-nonce CTR mode using substitutions
@@ -43,6 +46,7 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
 </details>
 <details>
 <summary>✅ Set 4, even more block ciphers</summary>
+
   - ✅ Break "random access read/write" AES CTR
   - ✅ CTR bitflipping
   - ✅ Recover the key from CBC with IV=Key
