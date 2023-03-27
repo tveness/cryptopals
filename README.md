@@ -8,7 +8,8 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
 
 # Status
 
-- ✅ Set 1, basics
+<details>
+<summary>✅ Set 1, basics</summary>
   - ✅ Convert hex to base64
   - ✅ Fixed XOR
   - ✅ Single-byte XOR cipher
@@ -17,7 +18,9 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
   - ✅ Break repeating-key XOR
   - ✅ AES in ECB mode
   - ✅ Detect AES in ECB mode
-- ✅ Set 2, block ciphers
+</details>
+<details>
+<summary>✅ Set 2, block ciphers</summary>
   - ✅ Implement PKCS#7 padding
   - ✅ Implement CBC mode
   - ✅ An ECB/CBC detection oracle
@@ -35,7 +38,9 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
   - ✅ Crack an MT19937 seed
   - ✅ Clone an MT19937 RNG from its output
   - ✅ Create the MT19937 stream cipher and break it
-- ✅ Set 4, even more block ciphers
+</details>
+<details>
+<summary>✅ Set 4, even more block ciphers</summary>
   - ✅ Break "random access read/write" AES CTR
   - ✅ CTR bitflipping
   - ✅ Recover the key from CBC with IV=Key
@@ -44,10 +49,13 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
   - ✅ Break an MD4 keyed MAC using length extension
   - ✅ Implement and break HMAC-SHA1 with an artificial timing leak
   - ✅ Break HMAC-SHA1 with a slightly less artificial timing leak
+</details>
 - [ ] Set 5, Diffie-Hellmann and friends
   - ✅ Implement Diffie-Hellman
-  - [ ] Implement a MITM key-fixing attack on Diffie-Hellman with parameter injection
-  - [ ] Implement DH with negotiated groups, and break with malicious "g" parameters
+  - ✅ Implement a MITM key-fixing attack on Diffie-Hellman with parameter
+  injection
+  - [ ] Implement DH with negotiated groups, and break with malicious "g"
+  parameters
   - [ ] Implement Secure Remote Password (SRP)
   - [ ] Break SRP with a zero key
   - [ ] Offline dictionary attack on simplified SRP
