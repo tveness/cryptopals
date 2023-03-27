@@ -61,7 +61,7 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
   - ✅ Implement Diffie-Hellman
   - ✅ Implement a MITM key-fixing attack on Diffie-Hellman with parameter
   injection
-  - [ ] Implement DH with negotiated groups, and break with malicious "g"
+  - ✅ Implement DH with negotiated groups, and break with malicious "g"
   parameters
   - [ ] Implement Secure Remote Password (SRP)
   - [ ] Break SRP with a zero key
