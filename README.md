@@ -65,7 +65,7 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
   parameters
   - ✅ Implement Secure Remote Password (SRP)
   - ✅ Break SRP with a zero key
-  - [ ] Offline dictionary attack on simplified SRP
+  - ✅ Offline dictionary attack on simplified SRP
   - [ ] Implement RSA
   - [ ] Implement an E=3 RSA Broadcast attack
 
