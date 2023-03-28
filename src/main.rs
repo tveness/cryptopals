@@ -53,6 +53,7 @@ fn main() -> Result<()> {
         34 => challenges::challenge34::main(),
         35 => challenges::challenge35::main(),
         36 => challenges::challenge36::main(),
+        37 => challenges::challenge37::main(),
         _ => Err(anyhow!("Invalid challenge number")),
     }?;
     Ok(())
