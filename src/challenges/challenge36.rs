@@ -149,3 +149,13 @@ pub fn main() -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_srp() {
+        main().unwrap();
+    }
+}
