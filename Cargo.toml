@@ -12,6 +12,7 @@ byteorder = "1.4.3"
 chrono = "0.4.24"
 clap = { version = "4.1.8", features = ["derive"] }
 hex = "0.4.3"
+hmac-sha256 = "1.1.6"
 itertools = "0.10.5"
 num-bigint = { version = "0.4.3", features = ["rand"] }
 num-traits = "0.2.15"

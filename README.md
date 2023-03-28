@@ -63,7 +63,7 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
   injection
   - ✅ Implement DH with negotiated groups, and break with malicious "g"
   parameters
-  - [ ] Implement Secure Remote Password (SRP)
+  - ✅ Implement Secure Remote Password (SRP)
   - [ ] Break SRP with a zero key
   - [ ] Offline dictionary attack on simplified SRP
   - [ ] Implement RSA
