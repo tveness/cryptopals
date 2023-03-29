@@ -105,6 +105,8 @@ pub fn main() -> Result<()> {
     let decrypted = rsa_decrypt(&private_key, &encrypted);
     println!("Decrypted: {}", bytes_to_hex(&decrypted));
 
+    assert_eq!(secret.to_vec(), decrypted);
+
     Ok(())
 }
 
@@ -135,5 +137,10 @@ mod tests {
         let target: BigInt = 2753.into();
         let im = invmod(&17, &3120);
         assert_eq!(im, target);
+    }
+
+    #[test]
+    fn rsa() {
+        main().unwrap();
     }
 }
