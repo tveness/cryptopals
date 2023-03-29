@@ -15,6 +15,7 @@ hex = "0.4.3"
 hmac-sha256 = "1.1.6"
 itertools = "0.10.5"
 num-bigint = { version = "0.4.3", features = ["rand"] }
+num-integer = "0.1.45"
 num-traits = "0.2.15"
 openssl = "0.10.46"
 rand = "0.8.5"
