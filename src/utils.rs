@@ -12,6 +12,7 @@ pub use crate::challenges::challenge11::{detect_mode, random_bytes, random_key, 
 pub use crate::challenges::challenge13::{pkcs7_unpad, PaddingError};
 pub use crate::challenges::challenge21::Mt;
 pub use crate::challenges::challenge28::{authenticate, u32_to_u8s, u8s_to_u32, Auth, Sha1Hasher};
+pub use crate::challenges::challenge39::{et_n, invmod, rsa_decrypt, rsa_encrypt};
 
 pub use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};

@@ -45,7 +45,7 @@ fn prime(bits: i32) -> BigInt {
     p
 }
 
-fn invmod<T: ToBigInt>(a: &T, m: &T) -> BigInt {
+pub fn invmod<T: ToBigInt>(a: &T, m: &T) -> BigInt {
     let m_orig = m.to_bigint().unwrap();
     let a = a.to_bigint().unwrap();
 
@@ -53,7 +53,7 @@ fn invmod<T: ToBigInt>(a: &T, m: &T) -> BigInt {
         return One::one();
     }
 
-    let (mut a, mut m, mut x, mut inv) = (a.clone(), m_orig.clone(), BigInt::zero(), BigInt::one());
+    let (mut a, mut m, mut x, mut inv) = (a, m_orig.clone(), BigInt::zero(), BigInt::one());
 
     while a > One::one() {
         let (div, rem) = a.div_rem(&m);
@@ -69,7 +69,7 @@ fn invmod<T: ToBigInt>(a: &T, m: &T) -> BigInt {
 
     inv
 }
-fn et(bits: i32, e: &BigInt) -> (BigInt, BigInt) {
+pub fn et_n(bits: i32, e: &BigInt) -> (BigInt, BigInt) {
     let mut et: BigInt = 0.into();
     let mut n = 0.into();
     while &et % e == Zero::zero() {
@@ -84,7 +84,7 @@ pub fn main() -> Result<()> {
     let bits = 256;
     let e: BigInt = 3.into();
 
-    let (et, n) = et(bits, &e);
+    let (et, n) = et_n(bits, &e);
 
     let d = invmod(&e, &et);
 
@@ -110,14 +110,14 @@ pub fn main() -> Result<()> {
     Ok(())
 }
 
-fn rsa_encrypt(public_key: &(BigInt, BigInt), data: &[u8]) -> Vec<u8> {
+pub fn rsa_encrypt(public_key: &(BigInt, BigInt), data: &[u8]) -> Vec<u8> {
     let data = BigInt::from_bytes_be(num_bigint::Sign::Plus, data);
 
     let encrypted = data.modpow(&public_key.0, &public_key.1);
     encrypted.to_bytes_be().1.to_vec()
 }
 
-fn rsa_decrypt(private_key: &(BigInt, BigInt), data: &[u8]) -> Vec<u8> {
+pub fn rsa_decrypt(private_key: &(BigInt, BigInt), data: &[u8]) -> Vec<u8> {
     let data = BigInt::from_bytes_be(num_bigint::Sign::Plus, data);
 
     let decrypted = data.modpow(&private_key.0, &private_key.1);

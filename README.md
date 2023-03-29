@@ -56,8 +56,9 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
   - ✅ Implement and break HMAC-SHA1 with an artificial timing leak
   - ✅ Break HMAC-SHA1 with a slightly less artificial timing leak
 </details>
+<details>
+<summary>✅ Set 5, Diffie-Hellmann and friends</summary>
 
-- [ ] Set 5, Diffie-Hellmann and friends
   - ✅ Implement Diffie-Hellman
   - ✅ Implement a MITM key-fixing attack on Diffie-Hellman with parameter
   injection
@@ -67,7 +68,18 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
   - ✅ Break SRP with a zero key
   - ✅ Offline dictionary attack on simplified SRP
   - ✅ Implement RSA
-  - [ ] Implement an E=3 RSA Broadcast attack
+  - ✅ Implement an E=3 RSA Broadcast attack
+</details>
+
+- [ ] Set 6, RSA and DSA
+  - [ ] Implement unpadded message recovery oracle
+  - [ ] Bleichenbacher's e=3 RSA Attack
+  - [ ] DSA key recovery from nonce
+  - [ ] DSA nonce recovery from repeated nonce
+  - [ ] DSA parameter tampering
+  - [ ] RSA parity oracle
+  - [ ] Bleichenbacher's PKCS 1.5 Padding Oracle (Simple Case)
+  - [ ] Bleichenbacher's PKCS 1.5 Padding Oracle (Complete Case)
 
 # Build
 
