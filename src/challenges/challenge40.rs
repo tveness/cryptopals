@@ -37,18 +37,18 @@ use num_bigint::BigInt;
 pub fn main() -> Result<()> {
     let e: BigInt = 3.into();
 
-    let (_et1, n1) = et_n(256, &e);
-    let d1 = invmod(&e, &n1);
+    let (et1, n1) = et_n(256, &e);
+    let d1 = invmod(&e, &et1);
     let public_key1 = (e.clone(), n1.clone());
     let _private_key1 = (d1, n1.clone());
 
-    let (_et2, n2) = et_n(256, &e);
-    let d2 = invmod(&e, &n2);
+    let (et2, n2) = et_n(256, &e);
+    let d2 = invmod(&e, &et2);
     let public_key2 = (e.clone(), n2.clone());
     let _private_key2 = (d2, n2.clone());
 
-    let (_et3, n3) = et_n(256, &e);
-    let d3 = invmod(&e, &n3);
+    let (et3, n3) = et_n(256, &e);
+    let d3 = invmod(&e, &et3);
     let public_key3 = (e, n3.clone());
     let _private_key3 = (d3, n3.clone());
 
