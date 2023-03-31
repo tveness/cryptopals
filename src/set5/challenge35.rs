@@ -20,7 +20,9 @@
 //! Write attacks for each.
 //!
 //! When does this ever happen?
-//! Honestly, not that often in real-world systems. If you can mess with "g", chances are you can mess with something worse. Most systems pre-agree on a static DH group. But the same construction exists in Elliptic Curve Diffie-Hellman, and this becomes more relevant there.
+//! Honestly, not that often in real-world systems. If you can mess with "g", chances are you can
+//! mess with something worse. Most systems pre-agree on a static DH group. But the same
+//! construction exists in Elliptic Curve Diffie-Hellman, and this becomes more relevant there.
 
 use crate::dh::nist_params;
 use crate::utils::*;
@@ -145,7 +147,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn paramter_injection() {
+    fn parameter_injection() {
         main().unwrap();
     }
 }

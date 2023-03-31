@@ -136,7 +136,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn paramter_injection() {
+    fn parameter_injection() {
         main().unwrap();
     }
 }
