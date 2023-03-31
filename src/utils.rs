@@ -4,15 +4,15 @@ use std::io::BufRead;
 use std::{collections::HashMap, fs::File, io::BufReader};
 
 // Re-export useful functions introduced in specific challenges
-pub use crate::challenges::challenge08::is_unique;
-pub use crate::challenges::challenge09::pkcs7_pad;
-pub use crate::challenges::challenge10::{cbc_decrypt, cbc_encrypt};
-pub use crate::challenges::challenge10::{ecb_decrypt, ecb_encrypt};
-pub use crate::challenges::challenge11::{detect_mode, random_bytes, random_key, Mode};
-pub use crate::challenges::challenge13::{pkcs7_unpad, PaddingError};
-pub use crate::challenges::challenge21::Mt;
-pub use crate::challenges::challenge28::{authenticate, u32_to_u8s, u8s_to_u32, Auth, Sha1Hasher};
-pub use crate::challenges::challenge39::{et_n, invmod, rsa_decrypt, rsa_encrypt};
+pub use crate::set1::challenge08::is_unique;
+pub use crate::set2::challenge09::pkcs7_pad;
+pub use crate::set2::challenge10::{cbc_decrypt, cbc_encrypt};
+pub use crate::set2::challenge10::{ecb_decrypt, ecb_encrypt};
+pub use crate::set2::challenge11::{detect_mode, random_bytes, random_key, Mode};
+pub use crate::set2::challenge13::{pkcs7_unpad, PaddingError};
+pub use crate::set3::challenge21::Mt;
+pub use crate::set4::challenge28::{authenticate, u32_to_u8s, u8s_to_u32, Auth, Sha1Hasher};
+pub use crate::set5::challenge39::{et_n, invmod, rsa_decrypt, rsa_encrypt};
 
 pub use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};

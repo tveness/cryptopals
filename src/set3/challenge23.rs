@@ -29,7 +29,7 @@
 
 use rand::{prelude::*, thread_rng};
 
-use crate::challenges::challenge21::{B, C, D, L, LOWEST_W, S, T, U};
+use super::challenge21::{B, C, D, L, LOWEST_W, S, T, U};
 use crate::utils::*;
 
 // ABCDEFGHIJKLMN

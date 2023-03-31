@@ -10,7 +10,7 @@ use crate::stream::Ctr;
 use crate::utils::*;
 use rand::{prelude::*, thread_rng};
 
-use crate::challenges::challenge16::contains_admin;
+use crate::set2::challenge16::contains_admin;
 
 fn embed(input: &[u8], key: &[u8], nonce: u64) -> Result<Vec<u8>> {
     let mut prepend: Vec<u8> = b"comment1=cooking%20MCs;userdata=".to_vec();

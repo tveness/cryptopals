@@ -29,7 +29,7 @@
 use crate::utils::*;
 use thiserror::Error;
 
-use crate::challenges::challenge16::contains_admin;
+use crate::set2::challenge16::contains_admin;
 
 fn embed(input: &[u8], key: &[u8]) -> Result<Vec<u8>> {
     let mut prepend: Vec<u8> = b"comment1=cooking%20MCs;userdata=".to_vec();
