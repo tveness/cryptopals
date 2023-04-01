@@ -74,7 +74,7 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
 - [ ] Set 6, RSA and DSA
   - ✅ Implement unpadded message recovery oracle
   - ✅ Bleichenbacher's e=3 RSA Attack
-  - [ ] DSA key recovery from nonce
+  - ✅ DSA key recovery from nonce
   - [ ] DSA nonce recovery from repeated nonce
   - [ ] DSA parameter tampering
   - [ ] RSA parity oracle
