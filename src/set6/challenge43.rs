@@ -73,16 +73,16 @@ use rand::thread_rng;
 use crate::utils::*;
 
 #[derive(Debug)]
-struct Params {
-    q: BigInt,
-    p: BigInt,
-    g: BigInt,
+pub struct Params {
+    pub q: BigInt,
+    pub p: BigInt,
+    pub g: BigInt,
 }
 
 #[derive(Debug)]
-struct Sig {
-    r: BigInt,
-    s: BigInt,
+pub struct Sig {
+    pub r: BigInt,
+    pub s: BigInt,
 }
 impl Default for Params {
     fn default() -> Self {
@@ -177,7 +177,7 @@ fn verify(y: &BigInt, params: &Params, message: &[u8], signature: &Sig) -> Auth 
 //           (s * k) - H(msg)
 //       x = ----------------  mod q
 //                   r
-fn get_x_from_k(signature: &Sig, k: &BigInt, params: &Params, message: &[u8]) -> BigInt {
+pub fn get_x_from_k(signature: &Sig, k: &BigInt, params: &Params, message: &[u8]) -> BigInt {
     let Params { q, .. } = params;
     let Sig { r, s } = signature;
     let h: BigInt = BigInt::from_bytes_be(Sign::Plus, &sha1(message));
