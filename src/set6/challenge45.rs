@@ -68,8 +68,6 @@ pub fn main() -> Result<()> {
     // We had to go in and remove the r!=0 to make this work
     let sig = sign_broken(&y, &params, message);
 
-    // Only now does g get modified
-
     println!("Signature: {:?}", sig);
     //  Deduced values:
     //  s = h/k when r=0;
