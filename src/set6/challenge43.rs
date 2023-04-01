@@ -115,7 +115,7 @@ impl Default for Params {
 }
 
 #[allow(dead_code)]
-fn sign(private_key: &BigInt, params: &Params, message: &[u8]) -> Sig {
+pub fn sign(private_key: &BigInt, params: &Params, message: &[u8]) -> Sig {
     let Params { q, p, g } = params;
 
     let mut rng = thread_rng();
@@ -138,7 +138,7 @@ fn sign(private_key: &BigInt, params: &Params, message: &[u8]) -> Sig {
 }
 
 #[allow(dead_code)]
-fn verify(y: &BigInt, params: &Params, message: &[u8], signature: &Sig) -> Auth {
+pub fn verify(y: &BigInt, params: &Params, message: &[u8], signature: &Sig) -> Auth {
     let Params { q, p, g } = params;
     let Sig { r, s } = signature;
     let h: BigInt = BigInt::from_bytes_be(Sign::Plus, &sha1(message));

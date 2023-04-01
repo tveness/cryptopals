@@ -43,9 +43,8 @@ use num_bigint::BigInt;
 use num_traits::Num;
 use openssl::sha::sha1;
 
-use super::challenge43::Params;
 use crate::{
-    set6::challenge43::{get_x_from_k, Sig},
+    set6::challenge43::{get_x_from_k, Params, Sig},
     utils::*,
 };
 

@@ -58,7 +58,7 @@ use openssl::sha::sha256;
 
 use crate::utils::*;
 
-fn verify(public_key: &(BigInt, BigInt), message: &[u8], signed_digest: &[u8]) -> Auth {
+pub fn verify(public_key: &(BigInt, BigInt), message: &[u8], signed_digest: &[u8]) -> Auth {
     let hash = sha256(message).to_vec();
     let digest = rsa_encrypt(public_key, signed_digest);
 
@@ -84,7 +84,7 @@ fn verify(public_key: &(BigInt, BigInt), message: &[u8], signed_digest: &[u8]) -
 }
 
 #[allow(dead_code)]
-fn sign(private_key: &(BigInt, BigInt), message: &[u8]) -> Vec<u8> {
+pub fn sign(private_key: &(BigInt, BigInt), message: &[u8]) -> Vec<u8> {
     // How big is the block? Let's say 256 bytes
     // SHA256 hash is 256 / 8 = 32 bytes
     // So this leaves
