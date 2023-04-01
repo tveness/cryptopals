@@ -53,8 +53,110 @@
 //! Forge a 1024-bit RSA signature for the string "hi mom". Make sure your implementation actually
 //! accepts the signature!
 
+use num_bigint::{BigInt, Sign};
+use openssl::sha::sha256;
+
 use crate::utils::*;
 
+fn verify(public_key: &(BigInt, BigInt), message: &[u8], signed_digest: &[u8]) -> Auth {
+    let hash = sha256(message).to_vec();
+    let digest = rsa_encrypt(public_key, signed_digest);
+
+    // First check there is an index where the hash exists
+    if let Some(index) = digest.windows(hash.len()).position(|x| *x.to_vec() == hash) {
+        // Should have form
+        // 00h 01h ffh ffh ... ffh ffh 00h ASN.1 GOOP HASH
+        // Ignore first 00 because it gets dropped from be
+        let mut target_padding = vec![0x01];
+        // What is l here?
+        let asn1 = b"SHA256";
+        let ff_len = index - (asn1.len() + 1 + 1);
+        target_padding.extend_from_slice(&vec![0xff; ff_len]);
+        target_padding.push(0x00);
+        target_padding.extend_from_slice(asn1);
+        match target_padding[..] == digest[..index] {
+            true => Auth::Valid,
+            false => Auth::Invalid,
+        }
+    } else {
+        Auth::Invalid
+    }
+}
+
+#[allow(dead_code)]
+fn sign(private_key: &(BigInt, BigInt), message: &[u8]) -> Vec<u8> {
+    // How big is the block? Let's say 256 bytes
+    // SHA256 hash is 256 / 8 = 32 bytes
+    // So this leaves
+    let hash = sha256(message).to_vec();
+    let mut padding = vec![0x00, 0x01];
+    let asn1 = b"SHA256";
+    let ff_len = 256 - (asn1.len() + 2 + 1 + hash.len());
+    padding.extend_from_slice(&vec![0xff; ff_len]);
+    padding.push(0x00);
+    padding.extend_from_slice(asn1);
+    padding.extend_from_slice(&hash);
+
+    rsa_decrypt(private_key, &padding)
+}
+
 pub fn main() -> Result<()> {
+    let e: BigInt = 3.into();
+    let (et, n) = et_n(1024, &e);
+    let d = invmod(&e, &et);
+    let public_key = (e, n.clone());
+    let _private_key = (d, n);
+
+    let message = b"hi mom";
+    let hash = sha256(message);
+    println!("Hash: {:?}", hash);
+    //let signed = sign(&private_key, message);
+
+    // Now to forge  the message
+    // Make an extremely small padding string
+    let mut padded = vec![0x01, 0xff, 0xff];
+    let asn1 = b"SHA256";
+    padded.push(0x00);
+    padded.extend_from_slice(asn1);
+    padded.extend_from_slice(&hash);
+    // Now make up a lot more of it by right-padding with junk (zeros make the cube root difficult
+    // to hit)
+    padded.extend_from_slice(&vec![0x01; 255 - padded.len()]);
+    // Convert to a BigInt
+    let padded_int = BigInt::from_bytes_be(Sign::Plus, &padded);
+    // Cube root
+    let forged_int = padded_int.cbrt();
+    let forged_message = BigInt::to_bytes_be(&forged_int);
+
+    println!("Forged: {:?}", forged_message.1);
+    let verified = verify(&public_key, message, &forged_message.1);
+    println!("Verified? {:?}", verified);
+
+    assert_eq!(verified, Auth::Valid);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn signing_validation() {
+        let e: BigInt = 3.into();
+        let (et, n) = et_n(1024, &e);
+        let d = invmod(&e, &et);
+        let public_key = (e.clone(), n.clone());
+        let private_key = (d, n.clone());
+
+        let message = b"hi mom";
+        let signed = sign(&private_key, message);
+        let verified = verify(&public_key, message, &signed);
+
+        assert_eq!(verified, Auth::Valid);
+    }
+
+    #[test]
+    fn forged() {
+        main().unwrap();
+    }
 }
