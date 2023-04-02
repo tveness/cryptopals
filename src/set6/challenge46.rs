@@ -95,12 +95,13 @@ pub fn main() -> Result<()> {
     // Ciphertext is encrypted with the public key
     let ciphertext = rsa(&public_key, &secret_num);
 
+    // All the work is in the deduce function, which only uses the private key to pass to the oracle
     let de = deduce(&ciphertext, &public_key, &private_key);
     println!("Secret number: {}", secret_num);
     println!("Deduce number: {}", de);
     assert_eq!(secret_num, de);
 
-    // We now have the secret, and simply have to convert it back
+    // We now have the secret, and simply have to convert it back to a str
     let secret_deduced = de.to_bytes_be().1;
     println!(
         "Deduced secret: {}",
@@ -139,24 +140,24 @@ fn deduce(ciphertext: &BigInt, public_key: &Key, private_key: &Key) -> BigInt {
     while &range.upper - &range.lower != one {
         running_ciphertext *= &multiplier;
         running_ciphertext %= &public_key.modulus;
+        range_multiplier *= &two;
 
         match parity_oracle(&running_ciphertext, private_key) {
             // Lower half i.e. < midpoint
             Parity::Even => {
                 running *= &two;
                 running -= &one;
-                // +1 is for ceil
-                range.upper = 1 + ((&running * &public_key.modulus) / (2 * &range_multiplier));
+                // Upper end of range is fraction we are bounded above by * modulus + 1 (for ceil)
+                range.upper = 1 + (&running * &public_key.modulus) / &range_multiplier;
             }
 
             // Upper half
             Parity::Odd => {
                 running *= &two;
-                // Lower range is upper - size of accuracy window
-                range.lower = &range.upper - &public_key.modulus / (2 * &range_multiplier) - 1;
+                // Lower end of range is upper - size of accuracy window - 1 (for floow)
+                range.lower = &range.upper - 1 - &public_key.modulus / &range_multiplier;
             }
         }
-        range_multiplier *= &two;
     }
     range.lower
 }
