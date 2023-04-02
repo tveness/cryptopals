@@ -43,7 +43,6 @@
 //! Decrypt the string (after encrypting it to a hidden private key) above.
 
 use num_bigint::{BigInt, Sign};
-use num_traits::{One, Zero};
 
 use crate::utils::*;
 
@@ -93,57 +92,20 @@ pub fn main() -> Result<()> {
     let secret = decode_b64_str(&secret_b64).unwrap();
     let secret_num = BigInt::from_bytes_be(Sign::Plus, &secret);
 
-    let ciphertext = rsa(&private_key, &secret_num);
-    // We are now all set up to begin the decryption
-    // We want to build a running list of the value of each bit
-    // When we multiply by 2**e, even parity tells us it didn't wrap, odd parity tells us it did wrap
-    // When we multiply by 4**e, then the same is true again. Let's check this in a simple case
-    // p = 29
-    // plaintext = 3
-    // ciphertext = 27 = 27
-    // original range: [0,28]
-    // double plaintext => 6 => even [0,14]
-    // double plaintext => 12 => even [0,7]
-    // double plaintext => 24 => even [0,3]
-    // double plaintext => 48 => 21 => odd [1,3]
-    // double plaintext => 42 => 13 => odd [2,3]
-    // double plaintext => 26 => even [3,3]
-    //
-    //
-    // Mock up v small
-    // p = 17, q= 11
-    // e = 3
-    // et = (p-1)(q-1) = 16*10 = 160
-    // d = invmod(3,160) = 187
-    // n = 187
-    let e: BigInt = 3.into();
-    let p: BigInt = 17.into();
-    let q: BigInt = 11.into();
-    let et = (&p - 1) * (&q - 1);
-    let d = invmod(&e, &et);
-    let n = &p * &q;
-    let public_key = Key {
-        key: e.clone(),
-        modulus: n.clone(),
-    };
-    let private_key = Key {
-        key: d.clone(),
-        modulus: n.clone(),
-    };
-    for secret_num in 0..187 {
-        let secret_num: BigInt = secret_num.into();
+    // Ciphertext is encrypted with the public key
+    let ciphertext = rsa(&public_key, &secret_num);
 
-        //println!("modinv: {}", d);
-        let ciphertext = rsa(&public_key, &secret_num);
+    let de = deduce(&ciphertext, &public_key, &private_key);
+    println!("Secret number: {}", secret_num);
+    println!("Deduce number: {}", de);
+    assert_eq!(secret_num, de);
 
-        let de = deduce(&ciphertext, &public_key, &private_key);
-        println!("Secret number: {}", secret_num);
-        println!("Deduce number: {}", de);
-        assert_eq!(secret_num, de);
-    }
-
-    //
-    //
+    // We now have the secret, and simply have to convert it back
+    let secret_deduced = de.to_bytes_be().1;
+    println!(
+        "Deduced secret: {}",
+        std::str::from_utf8(&secret_deduced).unwrap()
+    );
 
     Ok(())
 }
@@ -159,30 +121,23 @@ fn deduce(ciphertext: &BigInt, public_key: &Key, private_key: &Key) -> BigInt {
     let multiplier = two.modpow(&public_key.key, &public_key.modulus);
     let mut range_multiplier: BigInt = 1.into();
     let mut running: BigInt = 0.into();
-
-    // Every time the answer is in the lower half, the upper range decrease
-    // For upper range, everything is floor
-    // In the first round, this would take the upper range to floor(n/2)
-    // In the second round, it would be n/4 if twice, or 3n/4 if lower first
-    // The formula is thus (2**rounds-(binary sum of lowers successes) * n)/2**rounds
-
-    // Every time the answer is in the upper half, the lower range should increase
-    // For lower range everything is ceil
-    // In the first round, this would take the lower range to n/2
-    // In the second round, this would be 3n/4 if twice, or n/4 if upper first
-    // The formula is thus (2**rounds - (binary sum of upper successes) *n)/2**rounds
-    //
-    // The binary sums of upper and lower successes should be equal to 2**rounds - 1
-    // 2**rounds - 1 = U + L => 2**rounds - U = L+1
     let one: BigInt = 1.into();
 
-    // We choose to store *lower successes* in running
-    //println!("Range: {range:?}");
+    // How does this work? Each additional step gets us one more digit of accuracy in the binary
+    // fractional representation of the secret number
+    // The first step puts the unknown quantity either in (0,floor(p/2)) or (floor(p/2)+1,p)
+    // After n steps, the window is of a size p / 2**n from below the upper bound
+    // If the answer was in the upper half, the upper bound stays the same, so
+    // j/2**n -> 2j/2**(n+1)
+    // If the answer was in the lower half, the upper bound decreases by half the accuracy window
+    // i.e j/2**n -> 2j-1 / 2**(n+1)
+    //
+    // The code here achieves that, but flips things around a little bit
+
     while &range.upper - &range.lower != one {
         running_ciphertext *= &multiplier;
         running_ciphertext %= &public_key.modulus;
 
-        //println!("Adding: {}", plaintext % 2 == 1.into());
         match parity_oracle(&running_ciphertext, &private_key) {
             // Lower half i.e. < midpoint
             Parity::Even => {
@@ -201,13 +156,6 @@ fn deduce(ciphertext: &BigInt, public_key: &Key, private_key: &Key) -> BigInt {
             }
         }
         range_multiplier *= &two;
-        //println!(
-        //    "Running:{}/{range_multiplier}",
-        //    &range_multiplier - &running
-        //);
-        //println!("Range: {range:?}");
     }
-    //println!("Correct number: {}", plaintext);
-    //println!("Deduced number: {}", &range.lower);
     range.lower
 }
