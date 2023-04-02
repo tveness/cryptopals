@@ -89,7 +89,7 @@ pub fn main() -> Result<()> {
     let private_key = Key { key: d, modulus: n };
 
     let secret_b64 = "VGhhdCdzIHdoeSBJIGZvdW5kIHlvdSBkb24ndCBwbGF5IGFyb3VuZCB3aXRoIHRoZSBGdW5reSBDb2xkIE1lZGluYQ==";
-    let secret = decode_b64_str(&secret_b64).unwrap();
+    let secret = decode_b64_str(secret_b64).unwrap();
     let secret_num = BigInt::from_bytes_be(Sign::Plus, &secret);
 
     // Ciphertext is encrypted with the public key
@@ -120,10 +120,12 @@ fn deduce(ciphertext: &BigInt, public_key: &Key, private_key: &Key) -> BigInt {
     let two: BigInt = 2.into();
     let multiplier = two.modpow(&public_key.key, &public_key.modulus);
     let mut range_multiplier: BigInt = 1.into();
-    let mut running: BigInt = 0.into();
+    let mut running: BigInt = 1.into();
     let one: BigInt = 1.into();
 
-    // How does this work? Each additional step gets us one more digit of accuracy in the binary
+    // Explanation
+    //
+    // Each additional step gets us one more digit of accuracy in the binary
     // fractional representation of the secret number
     // The first step puts the unknown quantity either in (0,floor(p/2)) or (floor(p/2)+1,p)
     // After n steps, the window is of a size p / 2**n from below the upper bound
@@ -138,24 +140,57 @@ fn deduce(ciphertext: &BigInt, public_key: &Key, private_key: &Key) -> BigInt {
         running_ciphertext *= &multiplier;
         running_ciphertext %= &public_key.modulus;
 
-        match parity_oracle(&running_ciphertext, &private_key) {
+        match parity_oracle(&running_ciphertext, private_key) {
             // Lower half i.e. < midpoint
             Parity::Even => {
-                // Lower success increase
                 running *= &two;
-                running += &one;
-                range.upper = 1
-                    + (((2 * &range_multiplier - &running) * &public_key.modulus)
-                        / (2 * &range_multiplier));
+                running -= &one;
+                // +1 is for ceil
+                range.upper = 1 + ((&running * &public_key.modulus) / (2 * &range_multiplier));
             }
 
             // Upper half
             Parity::Odd => {
                 running *= &two;
+                // Lower range is upper - size of accuracy window
                 range.lower = &range.upper - &public_key.modulus / (2 * &range_multiplier) - 1;
             }
         }
         range_multiplier *= &two;
     }
     range.lower
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn secret_deduction() {
+        let e: BigInt = 3.into();
+        let p: BigInt = 17.into();
+        let q: BigInt = 11.into();
+        let et = (&p - 1) * (&q - 1);
+        let d = invmod(&e, &et);
+        let n = &p * &q;
+        // n = 187
+
+        let public_key = Key {
+            key: e.clone(),
+            modulus: n.clone(),
+        };
+        let private_key = Key {
+            key: d.clone(),
+            modulus: n.clone(),
+        };
+        for secret_num in 0..187 {
+            let secret_num: BigInt = secret_num.into();
+            // Encrypt secret
+            let ciphertext = rsa(&public_key, &secret_num);
+            let deduced = deduce(&ciphertext, &public_key, &private_key);
+            println!("Secret num:  {}", secret_num);
+            println!("Deduced num: {}", deduced);
+            assert_eq!(secret_num, deduced);
+        }
+    }
 }
