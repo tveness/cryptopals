@@ -122,30 +122,6 @@ pub fn main() -> Result<()> {
     let et = (&p - 1) * (&q - 1);
     let d = invmod(&e, &et);
     let n = &p * &q;
-    // Now run this by hand
-    // plaintext = 3 => [0,186]
-    // 6 [0,93]
-    // 12 [0,46]
-    // 24 [0,23]
-    // 48 [0,11]
-    // 96 [0,5]
-    // 192 -> 5 [3,5]
-    // 10 [3,4]
-    // 20 [3,3]
-
-    // It's really only the bits which are wrapping around
-    // So we need to keep track of which bit we're on
-    // 111111111
-    // 000000000
-    // 19 [0,93], [94,186]
-    //
-    // [0,186]
-    // First round [0,93] [94,186]
-    // => [186 -> 186 - 186/2 +1]
-    //
-    //
-    // lower + (upper-lower)/2
-    // 38 => [0,93], [0, 46], [47,93]
     let public_key = Key {
         key: e.clone(),
         modulus: n.clone(),
@@ -154,77 +130,84 @@ pub fn main() -> Result<()> {
         key: d.clone(),
         modulus: n.clone(),
     };
-    for secret_num in 10..187 {
+    for secret_num in 0..187 {
         let secret_num: BigInt = secret_num.into();
 
         //println!("modinv: {}", d);
-        println!("Secret number: {}", secret_num);
         let ciphertext = rsa(&public_key, &secret_num);
-        // This is an exclusive range
-        let mut range = Range {
-            lower: 0.into(),
-            upper: public_key.modulus.clone(),
-        };
-        let mut running_ciphertext = ciphertext.clone();
-        let two: BigInt = 2.into();
-        let multiplier = two.modpow(&public_key.key, &public_key.modulus);
-        let mut range_multiplier: BigInt = 1.into();
-        let mut running: BigInt = 0.into();
 
-        // Every time the answer is in the lower half, the upper range decrease
-        // For upper range, everything is floor
-        // In the first round, this would take the upper range to floor(n/2)
-        // In the second round, it would be n/4 if twice, or 3n/4 if lower first
-        // The formula is thus (2**rounds-(binary sum of lowers successes) * n)/2**rounds
-
-        // Every time the answer is in the upper half, the lower range should increase
-        // For lower range everything is ceil
-        // In the first round, this would take the lower range to n/2
-        // In the second round, this would be 3n/4 if twice, or n/4 if upper first
-        // The formula is thus (2**rounds - (binary sum of upper successes) *n)/2**rounds
-        //
-        // The binary sums of upper and lower successes should be equal to 2**rounds - 1
-        // 2**rounds - 1 = U + L => 2**rounds - U = L+1
-        let one: BigInt = 1.into();
-
-        // We choose to store *lower successes* in running
-        println!("Range: {range:?}");
-        while &range.upper - &range.lower != one {
-            running_ciphertext *= &multiplier;
-            running_ciphertext %= &public_key.modulus;
-
-            //println!("Adding: {}", plaintext % 2 == 1.into());
-            match parity_oracle(&running_ciphertext, &private_key) {
-                // Lower half i.e. < midpoint
-                Parity::Even => {
-                    // Lower success increase
-                    running *= &two;
-                    running += &one;
-                    range.upper = 1
-                        + (((2 * &range_multiplier - &running) * &public_key.modulus)
-                            / (2 * &range_multiplier));
-                }
-
-                // Upper half
-                Parity::Odd => {
-                    running *= &two;
-                    range.lower = &range.upper - &public_key.modulus / (2 * &range_multiplier) - 1;
-                }
-            }
-            range_multiplier *= &two;
-            println!(
-                "Running:{}/{range_multiplier}",
-                &range_multiplier - &running
-            );
-            println!("Range: {range:?}");
-        }
-        //println!("Correct number: {}", plaintext);
-        println!("Deduced number: {}", &range.lower);
-        assert_eq!(secret_num, range.lower);
+        let de = deduce(&ciphertext, &public_key, &private_key);
+        println!("Secret number: {}", secret_num);
+        println!("Deduce number: {}", de);
+        assert_eq!(secret_num, de);
     }
 
     //
     //
 
     Ok(())
+}
+
+fn deduce(ciphertext: &BigInt, public_key: &Key, private_key: &Key) -> BigInt {
+    // This is an exclusive range
+    let mut range = Range {
+        lower: 0.into(),
+        upper: public_key.modulus.clone(),
+    };
+    let mut running_ciphertext = ciphertext.clone();
+    let two: BigInt = 2.into();
+    let multiplier = two.modpow(&public_key.key, &public_key.modulus);
+    let mut range_multiplier: BigInt = 1.into();
+    let mut running: BigInt = 0.into();
+
+    // Every time the answer is in the lower half, the upper range decrease
+    // For upper range, everything is floor
+    // In the first round, this would take the upper range to floor(n/2)
+    // In the second round, it would be n/4 if twice, or 3n/4 if lower first
+    // The formula is thus (2**rounds-(binary sum of lowers successes) * n)/2**rounds
+
+    // Every time the answer is in the upper half, the lower range should increase
+    // For lower range everything is ceil
+    // In the first round, this would take the lower range to n/2
+    // In the second round, this would be 3n/4 if twice, or n/4 if upper first
+    // The formula is thus (2**rounds - (binary sum of upper successes) *n)/2**rounds
+    //
+    // The binary sums of upper and lower successes should be equal to 2**rounds - 1
+    // 2**rounds - 1 = U + L => 2**rounds - U = L+1
+    let one: BigInt = 1.into();
+
+    // We choose to store *lower successes* in running
+    //println!("Range: {range:?}");
+    while &range.upper - &range.lower != one {
+        running_ciphertext *= &multiplier;
+        running_ciphertext %= &public_key.modulus;
+
+        //println!("Adding: {}", plaintext % 2 == 1.into());
+        match parity_oracle(&running_ciphertext, &private_key) {
+            // Lower half i.e. < midpoint
+            Parity::Even => {
+                // Lower success increase
+                running *= &two;
+                running += &one;
+                range.upper = 1
+                    + (((2 * &range_multiplier - &running) * &public_key.modulus)
+                        / (2 * &range_multiplier));
+            }
+
+            // Upper half
+            Parity::Odd => {
+                running *= &two;
+                range.lower = &range.upper - &public_key.modulus / (2 * &range_multiplier) - 1;
+            }
+        }
+        range_multiplier *= &two;
+        //println!(
+        //    "Running:{}/{range_multiplier}",
+        //    &range_multiplier - &running
+        //);
+        //println!("Range: {range:?}");
+    }
+    //println!("Correct number: {}", plaintext);
+    //println!("Deduced number: {}", &range.lower);
+    range.lower
 }
