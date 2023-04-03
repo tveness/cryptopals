@@ -129,13 +129,11 @@ fn deduce(ciphertext: &BigInt, public_key: &Key, private_key: &Key) -> BigInt {
     // Each additional step gets us one more digit of accuracy in the binary
     // fractional representation of the secret number
     // The first step puts the unknown quantity either in (0,floor(p/2)) or (floor(p/2)+1,p)
-    // After n steps, the window is of a size p / 2**n from below the upper bound
+    // After n steps, the window is of a size p / 2**n below the upper bound
     // If the answer was in the upper half, the upper bound stays the same, so
     // j/2**n -> 2j/2**(n+1)
     // If the answer was in the lower half, the upper bound decreases by half the accuracy window
     // i.e j/2**n -> 2j-1 / 2**(n+1)
-    //
-    // The code here achieves that, but flips things around a little bit
 
     while &range.upper - &range.lower != one {
         running_ciphertext *= &multiplier;
@@ -154,7 +152,7 @@ fn deduce(ciphertext: &BigInt, public_key: &Key, private_key: &Key) -> BigInt {
             // Upper half
             Parity::Odd => {
                 running *= &two;
-                // Lower end of range is upper - size of accuracy window - 1 (for floow)
+                // Lower end of range is upper - size of accuracy window - 1 (for floor)
                 range.lower = &range.upper - 1 - &public_key.modulus / &range_multiplier;
             }
         }
