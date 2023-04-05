@@ -4,6 +4,7 @@ pub mod challenge43;
 pub mod challenge44;
 pub mod challenge45;
 pub mod challenge46;
+pub mod challenge47;
 
 use crate::utils::Result;
 use anyhow::anyhow;
@@ -16,7 +17,7 @@ pub fn run(c: u64) -> Result<()> {
         44 => challenge44::main(),
         45 => challenge45::main(),
         46 => challenge46::main(),
-        //47 => challenge47::main(),
+        47 => challenge47::main(),
         //48 => challenge48::main(),
         i => Err(anyhow!("{} not in set 6", i)),
     }
