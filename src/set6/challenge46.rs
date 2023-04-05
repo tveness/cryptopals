@@ -47,7 +47,7 @@ use num_bigint::{BigInt, Sign};
 use crate::utils::*;
 
 #[derive(Debug)]
-struct Key {
+pub struct Key {
     pub key: BigInt,
     pub modulus: BigInt,
 }
