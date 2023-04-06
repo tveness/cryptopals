@@ -1,7 +1,10 @@
 use std::collections::BTreeSet;
 use std::ops::Bound::Included;
+use std::ops::Mul;
 
-use num_bigint::{BigInt, RandBigInt};
+use num_bigint::{BigInt, RandBigInt, Sign};
+use num_integer::Integer;
+use num_traits::Num;
 use num_traits::{FromPrimitive, Zero};
 use rand::thread_rng;
 
@@ -138,6 +141,7 @@ impl IntervalTree {
 }
 
 // Make a finite state machine for the state of the algorithm matching Bleichenbacher '98
+#[derive(Debug)]
 enum Step {
     Step1,
     Step2a,
@@ -149,27 +153,96 @@ enum Step {
 
 struct Attacker {
     intervals: IntervalTree,
-    svec: Vec<BigInt>,
     c0: BigInt,
+    s0: BigInt,
+    s: BigInt,
     publickey: Key,
     privatekey: Key,
-    i: usize,
     b: BigInt,
     state: Step,
     c: BigInt,
 }
 
-fn is_pkcs(c: &BigInt, k: &Key) -> bool {
-    todo!()
+// What does this padding mean for the plaintext?
+// k is number of bytes, hence
+// 0x02,0x00,...,0x00,0x00
+// ->
+// 0x02,0xff,...,0xff,0x00
+//
+// The loose bound here is 2**(8(k-2)), all the way through to 2**(8k) - 1
+// This is 2B -> 3B-1
+// Whenever we have a valid plaintext, it must be in this interval
+//
+//
+
+fn is_pkcs(c: &BigInt, private_key: &Key) -> bool {
+    // First decrypt with the private key
+    let c_decrypted = c.modpow(&private_key.key, &private_key.modulus);
+
+    let cb = c_decrypted.to_bytes_be().1;
+    let mut k = private_key.modulus.bits() as usize;
+    k = k.div_ceil(&8);
+    if cb.len() != k - 1 {
+        return false;
+    }
+    cb[0] == 0x02
+    /*
+    let mut p_bytes = vec![0x00];
+    p_bytes.extend_from_slice(&c_decrypted.to_bytes_be().1);
+    for (i, b) in p_bytes.iter().enumerate() {
+        if i == 0 && *b != 0x00 {
+            return false;
+        }
+        if i == 1 && *b != 0x02 {
+            return false;
+        }
+        if i > 1 && i <= 9 && *b == 0x00 {
+            return false;
+        }
+        if i > 9 && *b == 0x00 {
+            return true;
+        }
+    }
+    false
+    */
 }
 
 impl Attacker {
-    pub fn new() -> Self {
-        todo!()
+    pub fn new(c: &BigInt, public_key: &Key, private_key: &Key) -> Self {
+        let mut intervals = IntervalTree::default();
+        let c0 = BigInt::zero();
+        let k: u32 = (private_key.modulus.bits() as u32 / 8).into();
+        let b = BigInt::from_u8(2).unwrap().pow(8 * (k - 2));
+        let c = c.clone();
+        let publickey: Key = public_key.clone();
+        let privatekey: Key = private_key.clone();
+        let state = Step::Step1;
+
+        let twob: BigInt = 2 * &b;
+        let one: BigInt = 1.into();
+        let tbm1: BigInt = 3 * &b - one;
+
+        let interval = Interval::new(&twob, &tbm1);
+        intervals.insert_interval(&interval);
+        let s: BigInt = BigInt::zero();
+        let s0: BigInt = BigInt::zero();
+
+        Self {
+            s,
+            s0,
+            intervals,
+            c0,
+            publickey,
+            privatekey,
+            b,
+            state,
+            c,
+        }
     }
 
     pub fn run(&mut self) -> BigInt {
         loop {
+            println!("State: {:?}", self.state);
             match self.state {
                 Step::Step1 => self.step1(),
                 Step::Step2a => self.step2a(),
@@ -184,118 +257,179 @@ impl Attacker {
         let mut rng = thread_rng();
         let mut s0 = rng.gen_bigint_range(&BigInt::zero(), &self.publickey.modulus);
         loop {
-            let c0 = &self.c * s0.modpow(&self.publickey.key, &self.publickey.modulus)
-                % &self.publickey.modulus;
+            let c0 = self
+                .c
+                .clone()
+                .mul(s0.modpow(&self.publickey.key, &self.publickey.modulus))
+                .mod_floor(&self.publickey.modulus);
             if is_pkcs(&c0, &self.privatekey) {
                 self.c0 = c0;
-                self.svec = vec![s0];
-                self.i = 1;
+                self.s0 = s0;
                 break;
             }
+            s0 = rng.gen_bigint_range(&BigInt::zero(), &self.publickey.modulus);
         }
 
         self.state = Step::Step2a;
     }
+    fn try_si(&self) -> bool {
+        // (c0 *(s)**e) mod n
+        let c = (&self.c0 * &self.s.modpow(&self.publickey.key, &self.publickey.modulus))
+            % &self.publickey.modulus;
+        is_pkcs(&c, &self.privatekey)
+    }
     fn step2a(&mut self) {
-        let mut s1: BigInt = &self.publickey.modulus / (3 * &self.b);
-        loop {
-            let c = &self.c0 * &s1.modpow(&self.publickey.key, &self.publickey.modulus)
-                % &self.publickey.modulus;
-            if is_pkcs(&c, &self.privatekey) {
-                self.svec.push(s1);
-                break;
-            }
-            s1 += 1;
+        let three_b: BigInt = &BigInt::from_u8(3).unwrap() * &self.b;
+        // Initialise s = n/3B;
+        self.s = self.publickey.modulus.clone();
+        self.s = self.s.div_ceil(&three_b);
+
+        while !self.try_si() {
+            self.s += 1;
         }
 
         self.state = Step::Step3;
     }
     fn step2b(&mut self) {
-        let mut s1: BigInt = self.svec[self.i].clone() + 1;
-        loop {
-            let c = &self.c0 * &s1.modpow(&self.publickey.key, &self.publickey.modulus)
-                % &self.publickey.modulus;
-            if is_pkcs(&c, &self.privatekey) {
-                self.svec.push(s1);
-                break;
-            }
-            s1 += 1;
+        self.s += 1;
+        while !self.try_si() {
+            self.s += 1;
         }
 
         self.state = Step::Step3;
     }
     fn step2c(&mut self) {
-        let Interval { start: a, end: b } = self.intervals.get_intervals()[0].clone();
-        let mut r = 2 * (&b * &self.svec[self.i] - 2 * &self.b) / &self.publickey.modulus;
-        'outer: loop {
-            let mut si: BigInt = (2 * &self.b + &r * &self.publickey.modulus) / &b;
-            let upper: BigInt = (3 * &self.b + &r * &self.publickey.modulus) / &a;
-            while &si < &upper {
-                let c = &self.c0 * &si.modpow(&self.publickey.key, &self.publickey.modulus);
+        assert_eq!(self.intervals.get_intervals().len(), 1);
+        let B: BigInt = self.b.clone();
+        let n: BigInt = self.publickey.modulus.clone();
 
-                if is_pkcs(&c, &self.privatekey) {
-                    self.svec.push(si);
-                    break 'outer;
-                }
-                si += 1;
+        assert_eq!(self.intervals.get_intervals().len(), 1);
+        // There is only one interval
+        let Interval { start: a, end: b } = self.intervals.get_intervals()[0].clone();
+        // Print size of interval just to check it's getting smaller
+        println!("Size of diff:        {}", &b - &a);
+        println!("Size of diff (bits): {}", (&b - &a).bits());
+        // r = 2(bs - 2B)/n
+        let mut r: BigInt = 2 * (&b * &self.s - 2 * &B);
+        r = r.div_ceil(&n);
+        self.s = 2 * &B + &r * &n;
+        self.s = self.s.div_ceil(&b);
+        let mut upper: BigInt = (3 * &B + &r * &n) / &a;
+
+        while !self.try_si() {
+            self.s += 1;
+
+            if &self.s > &upper {
+                r += 1;
+                upper = (3 * &B + &r * &n) / &a;
+                self.s = 2 * &B + &r * &n;
+                self.s = self.s.div_ceil(&b);
             }
-            r += 1;
         }
         self.state = Step::Step3;
     }
     fn step3(&mut self) {
         // First narrow set of solutions
 
+        println!("Intervals: {:?}", self.intervals.get_intervals());
         let mut new_m = IntervalTree::default();
+        let si = &self.s;
+        let two = BigInt::from_u8(2).unwrap();
 
         for interval in self.intervals.get_intervals() {
             let Interval { start: a, end: b } = interval;
+            println!("a,b: {a}, {b}");
 
-            let mut r = (&a * &self.svec[self.i] - 3 * &self.b + 1) / &self.publickey.modulus;
-            let upper = (&b * &self.svec[self.i] - 2 * &self.b) / &self.publickey.modulus;
-            while &r <= &upper {
-                let mut l: BigInt = BigInt::from_i32(1).unwrap()
-                    + (2 * &self.b + &r * &self.publickey.modulus) / &self.svec[self.i];
-                if &l < &a {
-                    l = a.clone();
-                }
-                let mut r: BigInt = (2 * &self.b - BigInt::from_u8(1).unwrap()
-                    + &r * &self.publickey.modulus)
-                    / &self.svec[self.i];
-                if &r < &b {
-                    r = b.clone();
-                }
-                let new_interval = Interval::new(&l, &r);
+            #[allow(non_snake_case)]
+            let B: BigInt = self.b.clone();
+            let n = self.publickey.modulus.clone();
+
+            let mut r: BigInt = &a * si - 3 * &B + 1;
+            r = r.div_ceil(&n);
+
+            let mut max_r: BigInt = &b * si - 2 * &B;
+            max_r = max_r.div_floor(&n);
+
+            while &r <= &max_r {
+                // max of a and
+                // (2B + rn)/s
+                let mut lval: BigInt = &two * &B + &r * &n;
+                lval = lval.div_ceil(si);
+                lval = lval.max(a.clone());
+
+                // min of b and
+                // (3B - 1 + rn)/s
+                let mut rval: BigInt = 3 * &B - 1 + &r * &n;
+                rval = rval.div_floor(si);
+                rval = rval.min(b.clone());
+
+                println!("l,r: {lval}, {rval}");
+                let new_interval = Interval::new(&lval, &rval);
                 new_m.insert_interval(&new_interval);
                 r += 1;
             }
         }
+
+        self.intervals = new_m;
+        println!("Intervals: {:?}", self.intervals.get_intervals());
 
         // Now determine which step to go to
         if self.intervals.get_intervals().len() == 1 {
             let Interval { start: a, end: b } = self.intervals.get_intervals()[0].clone();
             match a == b {
                 true => self.state = Step::Step4,
-                false => {
-                    self.i += 1;
-                    self.state = Step::Step2c;
-                }
+                false => self.state = Step::Step2c,
             }
         } else {
-            self.i += 1;
             self.state = Step::Step2b;
         }
     }
     fn step4(&self) -> BigInt {
         // To get here, m should contain one interval
         let Interval { start: a, .. } = self.intervals.get_intervals()[0].clone();
-        let s0inv = invmod(&self.svec[0], &self.publickey.modulus);
+        let s0inv = invmod(&self.s0, &self.publickey.modulus);
         let m = (a * s0inv) % &self.publickey.modulus;
         m
     }
 }
 
 pub fn main() -> Result<()> {
+    // Set up problem
+    let bits = 128;
+    let e: BigInt = 3.into();
+    let (et, n) = et_n(bits, &e);
+    let d = invmod(&e, &et);
+
+    let public_key = Key {
+        key: e,
+        modulus: n.clone(),
+    };
+    let private_key = Key { key: d, modulus: n };
+    let message = b"kick it, CC";
+    let mut pkcs_message: Vec<u8> = vec![0x00, 0x02];
+    let bytes = &private_key.modulus.bits() / 8;
+    pkcs_message.extend_from_slice(&vec![0xff; bytes as usize - 3 - message.len()]);
+    pkcs_message.push(0x00);
+    pkcs_message.extend_from_slice(message);
+
+    println!("PKCS message length: {}", pkcs_message.len());
+    println!("bytes: {}", bytes);
+    // PKCS pad this
+
+    let m = BigInt::from_bytes_be(Sign::Plus, &pkcs_message);
+    println!("m true: {m}");
+    let c = m.modpow(&public_key.key, &public_key.modulus);
+
+    // Check is is pkcs padded
+    println!("Is pkcs padded? {}", is_pkcs(&c, &private_key));
+
+    let mut attacker = Attacker::new(&c, &public_key, &private_key);
+
+    let md = attacker.run();
+
+    println!("m true: {m}");
+    println!("m     : {md}");
+
     Ok(())
 }
 
@@ -345,5 +479,15 @@ mod tests {
         assert_eq!(tree.get_intervals(), vec![two_fifteen_int]);
 
         println!("Tree: {:?}", tree.get_intervals());
+        let mut tree = IntervalTree::default();
+        let five_five_int =
+            Interval::new(&BigInt::from_i32(5).unwrap(), &BigInt::from_i32(5).unwrap());
+        let five_six_int =
+            Interval::new(&BigInt::from_i32(5).unwrap(), &BigInt::from_i32(6).unwrap());
+        let six_six_int =
+            Interval::new(&BigInt::from_i32(5).unwrap(), &BigInt::from_i32(6).unwrap());
+        tree.insert_interval(&five_five_int);
+        tree.insert_interval(&six_six_int);
+        assert_eq!(tree.get_intervals(), vec![five_six_int]);
     }
 }
