@@ -82,6 +82,7 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
   - ✅ Bleichenbacher's PKCS 1.5 Padding Oracle (Simple Case)
   - ✅ Bleichenbacher's PKCS 1.5 Padding Oracle (Complete Case)
 </details>
+
 # Build
 
 If you have rust [installed](https://rustup.rs/), it should be as simple as
