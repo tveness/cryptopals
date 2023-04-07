@@ -1,4 +1,4 @@
-Cryptopals solutions
+Cryptopals solutions (in rust)
 ====
 
 ![Completed](https://img.shields.io/github/v/tag/tveness/cryptopals?label=completed%20to%20challenge&style=for-the-badge)
@@ -70,24 +70,25 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
   - ✅ Implement RSA
   - ✅ Implement an E=3 RSA Broadcast attack
 </details>
+<details>
+<summary>✅ Set 6, RSA and DSA </summary>
 
-- [ ] Set 6, RSA and DSA
   - ✅ Implement unpadded message recovery oracle
   - ✅ Bleichenbacher's e=3 RSA Attack
   - ✅ DSA key recovery from nonce
   - ✅ DSA nonce recovery from repeated nonce
   - ✅ DSA parameter tampering
   - ✅ RSA parity oracle
-  - [ ] Bleichenbacher's PKCS 1.5 Padding Oracle (Simple Case)
-  - [ ] Bleichenbacher's PKCS 1.5 Padding Oracle (Complete Case)
-
+  - ✅ Bleichenbacher's PKCS 1.5 Padding Oracle (Simple Case)
+  - ✅ Bleichenbacher's PKCS 1.5 Padding Oracle (Complete Case)
+</details>
 # Build
 
-If you have rust installed, it's very easy to run!
+If you have rust [installed](https://rustup.rs/), it should be as simple as
 ```
 cargo run -- -c <CHALLENGE_NUMBER>
 ```
-will run the specified challenge!
+will run the specified challenge! Some slow ones are better run with `--release`.
 
 There are also a number of tests along the way to check the result of
 various challenges:
