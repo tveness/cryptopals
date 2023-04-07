@@ -29,18 +29,10 @@ impl Interval {
 }
 
 // Represents series of disjoint intervals
-//
+#[derive(Default)]
 struct IntervalTree {
     lefts: BTreeSet<BigInt>,
     rights: BTreeSet<BigInt>,
-}
-impl Default for IntervalTree {
-    fn default() -> Self {
-        IntervalTree {
-            lefts: Default::default(),
-            rights: Default::default(),
-        }
-    }
 }
 
 impl IntervalTree {
@@ -211,7 +203,7 @@ impl Attacker {
     pub fn new(c: &BigInt, public_key: &Key, private_key: &Key) -> Self {
         let mut intervals = IntervalTree::default();
         let c0 = BigInt::zero();
-        let k: u32 = (private_key.modulus.bits() as u32 / 8).into();
+        let k: u32 = private_key.modulus.bits() as u32 / 8;
         let b = BigInt::from_u8(2).unwrap().pow(8 * (k - 2));
         let c = c.clone();
         let publickey: Key = public_key.clone();
@@ -319,7 +311,7 @@ impl Attacker {
         while !self.try_si() {
             self.s += 1;
 
-            if &self.s > &upper {
+            if self.s > upper {
                 r += 1;
                 upper = (3 * &B + &r * &n) / &a;
                 self.s = 2 * &B + &r * &n;
@@ -350,7 +342,7 @@ impl Attacker {
             let mut max_r: BigInt = &b * si - 2 * &B;
             max_r = max_r.div_floor(&n);
 
-            while &r <= &max_r {
+            while r <= max_r {
                 // max of a and
                 // (2B + rn)/s
                 let mut lval: BigInt = &two * &B + &r * &n;
@@ -388,8 +380,7 @@ impl Attacker {
         // To get here, m should contain one interval
         let Interval { start: a, .. } = self.intervals.get_intervals()[0].clone();
         let s0inv = invmod(&self.s0, &self.publickey.modulus);
-        let m = (a * s0inv) % &self.publickey.modulus;
-        m
+        (a * s0inv) % &self.publickey.modulus
     }
 }
 
@@ -433,7 +424,7 @@ pub fn main() -> Result<()> {
     // Now strip off padding
     let index = decrypted_padded.iter().position(|&x| x == 0x00).unwrap();
     let decrypted = &decrypted_padded[index + 1..];
-    let decrypted_message = std::str::from_utf8(&decrypted).unwrap();
+    let decrypted_message = std::str::from_utf8(decrypted).unwrap();
     println!("Message: {}", decrypted_message);
     assert_eq!(decrypted, message);
 
@@ -496,5 +487,11 @@ mod tests {
         tree.insert_interval(&five_five_int);
         tree.insert_interval(&six_six_int);
         assert_eq!(tree.get_intervals(), vec![five_six_int]);
+    }
+
+    #[ignore = "slow"]
+    #[test]
+    fn bleichenbacher_small() {
+        main().unwrap();
     }
 }
