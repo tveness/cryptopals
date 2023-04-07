@@ -1,10 +1,10 @@
+#![allow(non_snake_case)]
 use std::collections::BTreeSet;
 use std::ops::Bound::Included;
 use std::ops::Mul;
 
 use num_bigint::{BigInt, RandBigInt, Sign};
 use num_integer::Integer;
-use num_traits::Num;
 use num_traits::{FromPrimitive, Zero};
 use rand::thread_rng;
 
@@ -143,7 +143,7 @@ enum Step {
     Step4,
 }
 
-struct Attacker {
+pub struct Attacker {
     intervals: IntervalTree,
     c0: BigInt,
     s0: BigInt,
@@ -167,13 +167,13 @@ struct Attacker {
 //
 //
 
-fn is_pkcs(c: &BigInt, private_key: &Key) -> bool {
+pub fn is_pkcs(c: &BigInt, private_key: &Key) -> bool {
     // First decrypt with the private key
     let c_decrypted = c.modpow(&private_key.key, &private_key.modulus);
 
     let cb = c_decrypted.to_bytes_be().1;
     let mut k = private_key.modulus.bits() as usize;
-    k = k.div_ceil(&8);
+    k = num_integer::Integer::div_ceil(&k, &8);
     if cb.len() != k - 1 {
         return false;
     }
@@ -323,16 +323,15 @@ impl Attacker {
     fn step3(&mut self) {
         // First narrow set of solutions
 
-        println!("Intervals: {:?}", self.intervals.get_intervals());
+        //println!("Intervals: {:?}", self.intervals.get_intervals());
         let mut new_m = IntervalTree::default();
         let si = &self.s;
         let two = BigInt::from_u8(2).unwrap();
 
         for interval in self.intervals.get_intervals() {
             let Interval { start: a, end: b } = interval;
-            println!("a,b: {a}, {b}");
+            //println!("a,b: {a}, {b}");
 
-            #[allow(non_snake_case)]
             let B: BigInt = self.b.clone();
             let n = self.publickey.modulus.clone();
 
@@ -355,7 +354,7 @@ impl Attacker {
                 rval = rval.div_floor(si);
                 rval = rval.min(b.clone());
 
-                println!("l,r: {lval}, {rval}");
+                //println!("l,r: {lval}, {rval}");
                 let new_interval = Interval::new(&lval, &rval);
                 new_m.insert_interval(&new_interval);
                 r += 1;
@@ -363,7 +362,7 @@ impl Attacker {
         }
 
         self.intervals = new_m;
-        println!("Intervals: {:?}", self.intervals.get_intervals());
+        //println!("Intervals: {:?}", self.intervals.get_intervals());
 
         // Now determine which step to go to
         if self.intervals.get_intervals().len() == 1 {
