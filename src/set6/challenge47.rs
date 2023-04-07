@@ -245,6 +245,8 @@ impl Attacker {
             }
         }
     }
+    // Blinding: we choose to skip this for a PKCS valid input,
+    // but it basically hides our input in a way that we can undo
     fn step1(&mut self) {
         let mut rng = thread_rng();
         // Start with
@@ -264,12 +266,14 @@ impl Attacker {
 
         self.state = Step::Step2a;
     }
+    // Consults the oracle in a way we use more than once
     fn try_si(&self) -> bool {
         // (c0 *(s)**e) mod n
         let c = (&self.c0 * &self.s.modpow(&self.publickey.key, &self.publickey.modulus))
             % &self.publickey.modulus;
         is_pkcs(&c, &self.privatekey)
     }
+    // Smallest s which can produce a PKCS-compliant message
     fn step2a(&mut self) {
         let three_b: BigInt = &BigInt::from_u8(3).unwrap() * &self.b;
         // Initialise s = n/3B;
@@ -282,6 +286,9 @@ impl Attacker {
 
         self.state = Step::Step3;
     }
+
+    // Can't do the efficient logarithmic searching, so fall back to linear search until we can
+    // again
     fn step2b(&mut self) {
         self.s += 1;
         while !self.try_si() {
@@ -290,6 +297,19 @@ impl Attacker {
 
         self.state = Step::Step3;
     }
+
+    // This is the key step
+    //
+    // We have m1 = m0s - rn
+    // m1 is in the range [2B, 3B-1] because it is PKCS
+    // And we know m0 in [a,b]
+    // Thus r >= (bs - 2B)/n
+    // and (2B+rn)/b <= s <= (3B-1+rn)/a
+    // BUT
+    // there are many solutions for r, s
+    // And so if we *choose* r to be twice as big as we need it to be, the valid range should
+    // shrink by 1/2. We thuse choose r = 2(bs-2B)/n, but could just as well choose 4 to shrink by
+    // a factor of 4, but it would take longer to find a solution on average
     fn step2c(&mut self) {
         assert_eq!(self.intervals.get_intervals().len(), 1);
         let B: BigInt = self.b.clone();
@@ -320,6 +340,18 @@ impl Attacker {
         }
         self.state = Step::Step3;
     }
+
+    // Again, m1 = m0s - rn
+    // m0 in various intervals [a,b]
+    // m1 in [2B, 3B-1] (what the oracle tells us)
+    //
+    // r_min = (as-3B+1)/n
+    // r_max = (bs-2B)/n
+    //
+    // Thus for each r, a narrower interval for m0 is bounded by what we already know (hence min/maxes),
+    // and could be shrunk by
+    // a' = (2B + rn)/s
+    // b' = (3B-1 + rn)/s
     fn step3(&mut self) {
         // First narrow set of solutions
 

@@ -53,7 +53,7 @@ pub fn main() -> Result<()> {
     // Now strip off padding
     let index = decrypted_padded.iter().position(|&x| x == 0x00).unwrap();
     let decrypted = &decrypted_padded[index + 1..];
-    let decrypted_message = std::str::from_utf8(&decrypted).unwrap();
+    let decrypted_message = std::str::from_utf8(decrypted).unwrap();
     println!("Message: {}", decrypted_message);
     assert_eq!(decrypted, message);
 
