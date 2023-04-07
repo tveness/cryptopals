@@ -255,19 +255,19 @@ impl Attacker {
     }
     fn step1(&mut self) {
         let mut rng = thread_rng();
-        let mut s0 = rng.gen_bigint_range(&BigInt::zero(), &self.publickey.modulus);
+        // Start with
+        self.s = 1.into();
         loop {
-            let c0 = self
+            self.c0 = self
                 .c
                 .clone()
-                .mul(s0.modpow(&self.publickey.key, &self.publickey.modulus))
+                .mul(self.s.modpow(&self.publickey.key, &self.publickey.modulus))
                 .mod_floor(&self.publickey.modulus);
-            if is_pkcs(&c0, &self.privatekey) {
-                self.c0 = c0;
-                self.s0 = s0;
+            if is_pkcs(&self.c0, &self.privatekey) {
+                self.s0 = self.s.clone();
                 break;
             }
-            s0 = rng.gen_bigint_range(&BigInt::zero(), &self.publickey.modulus);
+            self.s = rng.gen_bigint_range(&BigInt::zero(), &self.publickey.modulus);
         }
 
         self.state = Step::Step2a;
@@ -429,6 +429,13 @@ pub fn main() -> Result<()> {
 
     println!("m true: {m}");
     println!("m     : {md}");
+    let decrypted_padded = md.to_bytes_be().1;
+    // Now strip off padding
+    let index = decrypted_padded.iter().position(|&x| x == 0x00).unwrap();
+    let decrypted = &decrypted_padded[index + 1..];
+    let decrypted_message = std::str::from_utf8(&decrypted).unwrap();
+    println!("Message: {}", decrypted_message);
+    assert_eq!(decrypted, message);
 
     Ok(())
 }
