@@ -52,7 +52,6 @@ pub fn main() -> Result<()> {
         .zip(padded_original.iter())
         .map(|(x, y)| x ^ y)
         .collect();
-    // We should be able to produce the new mac directly from this, too
     target.extend_from_slice(&append);
     // The original message was more than a block, and we only modified the first block, so paste
     // this back on the end
