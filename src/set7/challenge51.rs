@@ -68,109 +68,185 @@ use flate2::Compression;
 use rand::{thread_rng, Rng};
 use std::io::prelude::*;
 
+enum Enc {
+    Stream,
+    Cbc,
+}
 struct Oracle {
     pub session_id: String,
     pub host: String,
+    pub keysize: usize,
 }
 impl Oracle {
     fn payload(&self, content: String) -> String {
         format!(
-            "POST/ HTTP/1.1\nHost: {}\nCookie: sessionid={}\nContent-Length\n: {}\n{}",
+            "POST/ HTTP/1.1\nHost: {}\nCookie: sessionid={}\nContent-Length: {}\n{}",
             self.host,
             self.session_id,
             content.len(),
             content
         )
     }
-    pub fn len(&self, content: String) -> usize {
+    pub fn len(&self, content: String, enc: &Enc) -> usize {
         let embed = self.payload(content);
+        //println!("Embedded: {}", embed);
         // Compress message
-        let mut e = DeflateEncoder::new(Vec::new(), Compression::default());
+        let mut e = DeflateEncoder::new(Vec::new(), Compression::best());
         e.write_all(&embed.as_bytes()).unwrap();
         let compressed = e.finish().unwrap();
 
         let mut rng = thread_rng();
         let key = random_key(16, &mut rng);
-        let nonce: u64 = rng.gen();
-        let stream = Ctr::new(&key, nonce);
 
-        let encrypted: Vec<u8> = compressed.iter().zip(stream).map(|(x, y)| x ^ y).collect();
-        // Refresh stream
-        let stream = Ctr::new(&key, nonce);
-        let decrypted: Vec<u8> = encrypted.iter().zip(stream).map(|(x, y)| x ^ y).collect();
-        decrypted.len()
+        // Determine compr
+        // The difference between the two is one of padding, but it doesn't really make a different
+        // because we reverse it in either case
+        match enc {
+            Enc::Stream => {
+                let nonce: u64 = rng.gen();
+                let stream = Ctr::new(&key, nonce);
+                let encrypted: Vec<u8> =
+                    compressed.iter().zip(stream).map(|(x, y)| x ^ y).collect();
+                // Refresh stream
+                let stream = Ctr::new(&key, nonce);
+                let decrypted: Vec<u8> = encrypted.iter().zip(stream).map(|(x, y)| x ^ y).collect();
+                decrypted.len()
+            }
+            Enc::Cbc => {
+                let iv = random_key(16, &mut rng);
+                let encrypted: Vec<u8> =
+                    cbc_encrypt(&pkcs7_pad(&compressed, 16), &key, Some(&iv)).unwrap();
+                // Refresh stream
+                let decrypted: Vec<u8> =
+                    pkcs7_unpad(&cbc_decrypt(&encrypted, &key, Some(&iv)).unwrap()).unwrap();
+                decrypted.len()
+            }
+        }
     }
 }
 
-pub fn main() -> Result<()> {
-    // Initialise oracle
+fn make_guess(oracle: &Oracle, enc: Enc) -> (String, usize) {
     let mut rng = thread_rng();
-    let session_id = bytes_to_hex(&random_key(16, &mut rng));
-    let host = String::from("cryptopals.com");
-    let oracle = Oracle { session_id, host };
-
     let session_header = format!("POST/ HTTP/1.1\nHost: {}\nCookie: sessionid=", oracle.host);
+    //let session_header = format!("sessionid=");
     // Let's check what compression looks like using the correct string, rather than the wrong one
-    println!("session id: {}", oracle.session_id);
-    println!("session id l: {}", oracle.session_id.len());
-
-    // What's the plan here? Take our guess for the session id, and paste it in a few times with
-    // junk afterwards to stop the algorithm from compressing the repeated part
-    // Only append text bytes
-    // Do two bytes at a time
-    // 255*255 =
+    //println!("session id: {}", oracle.session_id);
+    //println!("session id l: {}", oracle.session_id.len());
 
     // Make a guess of our id, and run through each time picking the best version
-    let mut guess_id: Vec<u8> = random_key(16, &mut rng);
-    println!("OG guess: {}", bytes_to_hex(&guess_id));
+    let mut guess_id: String = bytes_to_hex(&random_key(oracle.keysize, &mut rng));
+    //println!("OG guess: {}", guess_id);
+    let chars = vec![
+        'a', 'b', 'c', 'd', 'e', 'f', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+    ];
 
-    for _pass in 0..100 {
-        let junk = random_key(16, &mut rng);
-        let prefix_skip = rng.gen::<usize>() % 5;
-        for byte_num in 0..guess_id.len() {
-            let minl = (0x00..0xff)
-                .map(|b| {
-                    let mut new_guess = guess_id.clone();
-                    new_guess[byte_num] = b;
-                    let mut new_guess_hex = bytes_to_hex(&new_guess[..byte_num + 1]);
-                    new_guess_hex.push_str(&bytes_to_hex(&junk[byte_num + 1..]));
+    // Have some junk which we can use to disambiguate different equally-good compression
+    let mut junk = bytes_to_hex(&random_key(4, &mut rng));
+    for _pass in 0..3 {
+        for char_num in 0..guess_id.len() {
+            #[allow(unused_assignments)]
+            let mut minimum = (&'a', 1e6 as usize);
+            loop {
+                let minl = chars
+                    .iter()
+                    .map(|c| {
+                        // Take current guess so far and add the new guess character
+                        let mut new_guess: String = guess_id.chars().take(char_num).collect();
+                        new_guess.push(*c);
 
-                    //println!("tru guess: {}", &oracle.session_id);
-                    //println!("new guess: {}", new_guess_hex);
-                    let mut current_guess = vec![];
-                    for s in 0..prefix_skip + 1 {
-                        current_guess.extend_from_slice(&session_header.as_bytes()[s..]);
-                        current_guess.extend_from_slice(&new_guess_hex.as_bytes());
-                        /*
-                        println!("New guess hex: {}", new_guess_hex);
-                        println!(
-                            "Cur guess hex: {}",
-                            std::str::from_utf8(&current_guess).unwrap()
-                        );
-                        */
-                    }
-                    if let Ok(s) = std::str::from_utf8(&current_guess) {
+                        let mut current_guess = String::new();
+                        for _ in 0..2 {
+                            current_guess.push_str(&session_header);
+                            current_guess.push_str(&new_guess);
+                            current_guess.push_str(&junk);
+                        }
                         //println!("Current guess: {}", &s[..64]);
-                        (b, oracle.len(s.into()))
-                    } else {
-                        (b, 1e6 as usize)
-                    }
+                        (c, oracle.len(current_guess, &enc))
+                    })
+                    .collect::<Vec<_>>();
+                //println!("MIN: {:?}", minl);
+                minimum = *minl.iter().min_by(|x, y| x.1.cmp(&y.1)).unwrap();
+                if minl.iter().filter(|x| x.1 == minimum.1).count() == 1 {
+                    break;
+                }
+                // If there's no best compression, re-randomise the junk and try again
+                junk = bytes_to_hex(&random_key(4, &mut rng));
+            }
+
+            guess_id = guess_id
+                .chars()
+                .enumerate()
+                .map(|(i, ch)| match i == char_num {
+                    true => *minimum.0,
+                    false => ch,
                 })
-                .min_by(|x, y| x.1.cmp(&y.1));
-            /*
-            println!(
-                "min l = {}, true: {}",
-                minl.unwrap().0,
-                oracle.session_id.as_bytes()[byte_num]
-            );
-            */
-            guess_id[byte_num] = minl.unwrap().0;
+                .collect();
         }
-        println!("Key:   {}", oracle.session_id);
-        println!("Guess: {}", bytes_to_hex(&guess_id));
+        //println!("Key:   {}", oracle.session_id);
+        //println!("Guess: {}", guess_id);
     }
 
-    //        .collect::<Vec<(u8, usize)>>();
+    let mut guess = String::new();
+    guess.push_str(&session_header);
+    guess.push_str(&guess_id);
+
+    (guess_id, oracle.len(guess, &enc))
+}
+
+pub fn main() -> Result<()> {
+    let keysize = 16;
+    // Initialise oracle
+    let mut rng = thread_rng();
+    let session_id = bytes_to_hex(&random_key(keysize, &mut rng));
+    //let session_id = String::from("e2df42256d4cc3bec3a9cdce1c55c5e3");
+
+    let host = String::from("cryptopals.com");
+    let oracle = Oracle {
+        session_id,
+        host,
+        keysize,
+    };
+
+    // The correct answer should have a particular length, and our solution doesn't always get the
+    // correct answer, so we ensure that it is a good one
+    // The compression achieved eliminates the extra string + about 3 bytes for keysize=16, and this appears to be
+    // a good enough heuristic to succeed
+    let target_length = oracle.len(String::new(), &Enc::Stream) + 3;
+
+    // Run until we find good compression
+    loop {
+        let (best_guess, l) = make_guess(&oracle, Enc::Stream);
+        if l <= target_length {
+            println!("Key:   {}", oracle.session_id);
+            println!("Guess: {}", best_guess);
+            assert_eq!(oracle.session_id, best_guess);
+            break;
+        }
+    }
+    // Do it again, but for CBC
+    let target_length = oracle.len(String::new(), &Enc::Cbc) + 48 / keysize;
+
+    // Run until we find good compression
+    loop {
+        let (best_guess, l) = make_guess(&oracle, Enc::Cbc);
+        if l <= target_length {
+            println!("Key:   {}", oracle.session_id);
+            println!("Guess: {}", best_guess);
+            assert_eq!(oracle.session_id, best_guess);
+            break;
+        }
+    }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[ignore = "slow"]
+    #[test]
+    fn crack() {
+        main().unwrap();
+    }
 }
