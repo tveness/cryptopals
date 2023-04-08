@@ -92,7 +92,7 @@ impl Oracle {
         //println!("Embedded: {}", embed);
         // Compress message
         let mut e = DeflateEncoder::new(Vec::new(), Compression::best());
-        e.write_all(&embed.as_bytes()).unwrap();
+        e.write_all(embed.as_bytes()).unwrap();
         let compressed = e.finish().unwrap();
 
         let mut rng = thread_rng();
