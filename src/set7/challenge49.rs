@@ -1,7 +1,6 @@
 //! CBC-MAC Message Forgery
 //!
 //! Let's talk about CBC-MAC.
-//!
 //! CBC-MAC is like this:
 //!
 //! Take the plaintext P.
@@ -79,17 +78,22 @@
 //!
 //! Food for thought: How would you modify the protocol to prevent this?
 
-fn cbc_mac_verify(message: &[u8], mac: &[u8], iv: Option<&[u8]>, key: &[u8]) -> Auth {
-    let enc = match cbc_encrypt(message, key, iv) {
+pub fn cbc_mac_verify(message: &[u8], mac: &[u8], iv: Option<&[u8]>, key: &[u8]) -> Auth {
+    let test_mac = match cbc_mac(message, key, iv) {
         Ok(x) => x,
         Err(_) => return Auth::Invalid,
     };
-    let test_mac = &enc[enc.len() - 16..];
 
     match test_mac == mac {
         true => Auth::Valid,
         false => Auth::Invalid,
     }
+}
+
+pub fn cbc_mac(message: &[u8], key: &[u8], iv: Option<&[u8]>) -> Result<Vec<u8>> {
+    let enc = cbc_encrypt(message, key, iv)?;
+    let mac = &enc[enc.len() - 16..];
+    Ok(mac.to_vec())
 }
 
 use rand::thread_rng;

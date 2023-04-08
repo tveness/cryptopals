@@ -85,7 +85,7 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
 
 - [ ] Set 7, Hashes
   - ✅ CBC-MAC Message Forgery
-  - [ ] Hashing with CBC-MAC
+  - ✅ Hashing with CBC-MAC
   - [ ] Compression Ratio Side-Channel Attacks
   - [ ] Iterated Hash Function Multicollisions
   - [ ] Kelsey and Schneier's Expandable Messages
