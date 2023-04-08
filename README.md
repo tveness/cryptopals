@@ -87,7 +87,7 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
 - [ ] Set 7, Hashes
   - ✅ 49. CBC-MAC Message Forgery [src](src/set7/challenge49.rs)
   - ✅ 50. Hashing with CBC-MAC [src](src/set7/challenge50.rs)
-  - [ ] 51. Compression Ratio Side-Channel Attacks
+  - ✅ 51. Compression Ratio Side-Channel Attacks [src](src/set7/challenge51.rs)
   - [ ] 52. Iterated Hash Function Multicollisions
   - [ ] 53. Kelsey and Schneier's Expandable Messages
   - [ ] 54. Kelsey and Kohno's Nostradamus Attack
