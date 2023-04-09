@@ -287,7 +287,7 @@ impl Attacker {
     }
 
     pub fn run(&mut self) -> BigInt {
-        let pb = ProgressBar::new(self.b.bits() as u64);
+        let pb = ProgressBar::new(self.b.bits());
         pb.set_message("Searching for plaintext");
         pb.set_style(
             ProgressStyle::with_template(

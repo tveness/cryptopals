@@ -99,8 +99,7 @@ impl Crash {
 
         encrypter.update(chunk, &mut ciphertext).unwrap();
 
-        let new_state = ((ciphertext[0] as u16) << 8) + (ciphertext[1] as u16);
-        new_state
+        ((ciphertext[0] as u16) << 8) + (ciphertext[1] as u16)
     }
 }
 
@@ -151,8 +150,7 @@ impl SlowCrash {
 
         encrypter.update(chunk, &mut ciphertext).unwrap();
 
-        let new_state = ((ciphertext[0] as u16) << 8) + (ciphertext[1] as u16);
-        new_state
+        ((ciphertext[0] as u16) << 8) + (ciphertext[1] as u16)
     }
 }
 
@@ -277,6 +275,7 @@ fn get_bits_for_slow_collision(
     // (n+1)
     for i in 0..(1 << n) {
         let mut slow_hasher = SlowCrash::default();
+        #[allow(clippy::needless_range_loop)]
         for bit in 0..n {
             match ((i >> bit) & 0x01) == 0x01 {
                 true => slow_hasher.update(&collision_pairs[bit].0),
@@ -297,12 +296,22 @@ fn get_bits_for_slow_collision(
     None
 }
 
-fn get_slow_and_fast_collision(search_size: usize) -> (Vec<(Vec<u8>, Vec<u8>)>, (usize, usize)) {
+struct SlowFastCollision {
+    pairs: Vec<(Vec<u8>, Vec<u8>)>,
+    path_a: usize,
+    path_b: usize,
+}
+
+fn get_slow_and_fast_collision(search_size: usize) -> SlowFastCollision {
     // Keep generating until we find a collision pair
     loop {
         let collision_pairs = gen_collision_pairs::<Crash>(0, search_size);
         if let Some(bitpair) = get_bits_for_slow_collision(&collision_pairs) {
-            return (collision_pairs, bitpair);
+            return SlowFastCollision {
+                pairs: collision_pairs,
+                path_a: bitpair.0,
+                path_b: bitpair.1,
+            };
         }
         println!("Had to loop");
     }
@@ -322,20 +331,26 @@ pub fn main() -> Result<()> {
 
     let n = 16;
     // Does this until a solution is found
-    let (collision_pairs, bitpair) = get_slow_and_fast_collision(n);
+    let SlowFastCollision {
+        pairs: collision_pairs,
+        path_a,
+        path_b,
+    } = get_slow_and_fast_collision(n);
 
-    println!("Bitpair: {:?}", bitpair);
+    println!("Bitpair: {}, {}", path_a, path_b);
     // Bitpair now determines two blocks
     let mut a_blocks = vec![];
     let mut b_blocks = vec![];
 
     // Reconstruct blocks from bit-patterns
+
+    #[allow(clippy::needless_range_loop)]
     for bit in 0..n {
-        match ((bitpair.0 >> bit) & 0x01) == 0x01 {
+        match ((path_a >> bit) & 0x01) == 0x01 {
             true => a_blocks.extend_from_slice(&collision_pairs[bit].0),
             false => a_blocks.extend_from_slice(&collision_pairs[bit].1),
         }
-        match ((bitpair.1 >> bit) & 0x01) == 0x01 {
+        match ((path_b >> bit) & 0x01) == 0x01 {
             true => b_blocks.extend_from_slice(&collision_pairs[bit].0),
             false => b_blocks.extend_from_slice(&collision_pairs[bit].1),
         }
