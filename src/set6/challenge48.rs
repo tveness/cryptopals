@@ -53,11 +53,12 @@ pub fn main() -> Result<()> {
     let mut rng = thread_rng();
 
     // Make the message a bit more interesting this time
-    // Pick 30 bytes from War and Peace
+    // Pick 40 bytes from War and Peace
     let wap_full = std::fs::read_to_string("./data/wap.txt").unwrap();
-    let idx: usize = rng.gen_range(0..wap_full.len() - 40);
+    let idx: usize = rng.gen_range(0..wap_full.chars().count() - 40);
 
-    let message = wap_full[idx..idx + 40].as_bytes();
+    let message = wap_full.chars().skip(idx).take(40).collect::<String>();
+    let message = message.as_bytes();
     let mut pkcs_message: Vec<u8> = vec![0x00, 0x02];
     let bytes = &private_key.modulus.bits() / 8;
     pkcs_message.extend_from_slice(&vec![0xff; bytes as usize - 3 - message.len()]);
