@@ -62,6 +62,7 @@ use num_traits::{FromPrimitive, Zero};
 use rand::thread_rng;
 
 use crate::utils::*;
+use indicatif::{ProgressBar, ProgressStyle};
 
 use super::challenge46::Key;
 
@@ -286,15 +287,34 @@ impl Attacker {
     }
 
     pub fn run(&mut self) -> BigInt {
+        let pb = ProgressBar::new(self.b.bits() as u64);
+        pb.set_message("Searching for plaintext");
+        pb.set_style(
+            ProgressStyle::with_template(
+                "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+            )
+            .unwrap()
+            .progress_chars("##-"),
+        );
+
         loop {
-            println!("State: {:?}", self.state);
+            if self.intervals.get_intervals().len() == 1 {
+                let Interval { start: a, end: b } = self.intervals.get_intervals()[0].clone();
+                // Print size of interval just to check it's getting smaller
+                pb.set_message(format!("Size of interval: {}", (&b - &a).bits()));
+                pb.set_position(self.b.bits() - (&b - &a).bits());
+            }
+            //println!("State: {:?}", self.state);
             match self.state {
                 Step::Step1 => self.step1(),
                 Step::Step2a => self.step2a(),
                 Step::Step2b => self.step2b(),
                 Step::Step2c => self.step2c(),
                 Step::Step3 => self.step3(),
-                Step::Step4 => return self.step4(),
+                Step::Step4 => {
+                    pb.finish();
+                    return self.step4();
+                }
             }
         }
     }
@@ -372,8 +392,8 @@ impl Attacker {
         // There is only one interval
         let Interval { start: a, end: b } = self.intervals.get_intervals()[0].clone();
         // Print size of interval just to check it's getting smaller
-        println!("Size of diff:        {}", &b - &a);
-        println!("Size of diff (bits): {}", (&b - &a).bits());
+        //println!("Size of diff:        {}", &b - &a);
+        //println!("Size of diff (bits): {}", (&b - &a).bits());
         // r = 2(bs - 2B)/n
         let mut r: BigInt = 2 * (&b * &self.s - 2 * &B);
         r = r.div_ceil(&n);

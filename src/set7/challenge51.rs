@@ -65,6 +65,7 @@
 use crate::{stream::Ctr, utils::*};
 use flate2::write::DeflateEncoder;
 use flate2::Compression;
+use indicatif::ProgressBar;
 use rand::{thread_rng, Rng};
 use std::io::prelude::*;
 
@@ -213,10 +214,14 @@ pub fn main() -> Result<()> {
     // a good enough heuristic to succeed
     let target_length = oracle.len(String::new(), &Enc::Stream) + 3;
 
+    let stream_spinner = ProgressBar::new_spinner();
+    stream_spinner.set_message("Finding stream key");
     // Run until we find good compression
     loop {
+        stream_spinner.tick();
         let (best_guess, l) = make_guess(&oracle, Enc::Stream);
         if l <= target_length {
+            stream_spinner.finish();
             println!("Key:   {}", oracle.session_id);
             println!("Guess: {}", best_guess);
             assert_eq!(oracle.session_id, best_guess);
@@ -226,10 +231,14 @@ pub fn main() -> Result<()> {
     // Do it again, but for CBC
     let target_length = oracle.len(String::new(), &Enc::Cbc) + 48 / keysize;
 
+    let stream_spinner = ProgressBar::new_spinner();
+    stream_spinner.set_message("Finding CBC key");
     // Run until we find good compression
     loop {
+        stream_spinner.tick();
         let (best_guess, l) = make_guess(&oracle, Enc::Cbc);
         if l <= target_length {
+            stream_spinner.finish();
             println!("Key:   {}", oracle.session_id);
             println!("Guess: {}", best_guess);
             assert_eq!(oracle.session_id, best_guess);

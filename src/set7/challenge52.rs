@@ -66,6 +66,7 @@
 use std::collections::HashMap;
 
 use crate::utils::*;
+use indicatif::{ProgressBar, ProgressStyle};
 use openssl::symm::{Cipher, Crypter, Mode};
 use rand::{thread_rng, Rng};
 
@@ -221,6 +222,17 @@ fn gen_collision_pairs<T: CrapHasher>(
     // Pairs of blocks
     let mut pairs: Vec<(Vec<u8>, Vec<u8>)> = vec![];
     let mut states = vec![initial_state];
+
+    let pb = ProgressBar::new(length as u64);
+    pb.set_message("Generating collisions");
+    pb.set_style(
+        ProgressStyle::with_template(
+            "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+        )
+        .unwrap()
+        .progress_chars("##-"),
+    );
+
     for i in 0..length {
         // Okay, now how are we going to generate collisions?
         // First, we find a collision given a particular initial state
@@ -238,7 +250,9 @@ fn gen_collision_pairs<T: CrapHasher>(
         pairs.push(pair);
         states.push(hash0);
         //println!("States: {:?}", states);
+        pb.inc(1);
     }
+    pb.finish();
     pairs
 }
 
@@ -247,10 +261,21 @@ fn get_bits_for_slow_collision(
 ) -> Option<(usize, usize)> {
     let mut map = HashMap::new();
     let n = collision_pairs.len();
+
+    let pb = ProgressBar::new((1 << n) as u64);
+    pb.set_message("Generating slow collisions");
+    pb.set_style(
+        ProgressStyle::with_template(
+            "[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}",
+        )
+        .unwrap()
+        .progress_chars("##-"),
+    );
+
     // Now run through each of these and determine whether there is a collision for slow_crash
     // How many options utilise the full tree? n choices, so 2**n distinct hashes, 2**n = 1 <<<
     // (n+1)
-    for i in 0..(1 << (n + 1)) {
+    for i in 0..(1 << n) {
         let mut slow_hasher = SlowCrash::default();
         for bit in 0..n {
             match ((i >> bit) & 0x01) == 0x01 {
@@ -261,9 +286,11 @@ fn get_bits_for_slow_collision(
         let h = slow_hasher.finalise();
 
         if let Some(old) = map.get(&h) {
+            pb.finish_with_message(format!("Found collision after {} attempts", i));
             println!("Total calls: {}", i);
             return Some((*old, i));
         } else {
+            pb.inc(1);
             map.insert(h, i);
         }
     }
