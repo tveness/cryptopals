@@ -88,11 +88,11 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
   - ✅ 49. CBC-MAC Message Forgery [src](src/set7/challenge49.rs)
   - ✅ 50. Hashing with CBC-MAC [src](src/set7/challenge50.rs)
   - ✅ 51. Compression Ratio Side-Channel Attacks [src](src/set7/challenge51.rs)
-  - ✅ 52. Iterated Hash Function Multicollisions
-  - [ ] 53. Kelsey and Schneier's Expandable Messages
-  - [ ] 54. Kelsey and Kohno's Nostradamus Attack
-  - [ ] 55. MD4 Collisions
-  - [ ] 56. RC4 Single-Byte Biases
+  - ✅ 52. Iterated Hash Function Multicollisions [src](src/set7/challenge52.rs)
+  - [ ] 53. Kelsey and Schneier's Expandable Messages [src](src/set7/challenge53.rs)
+  - [ ] 54. Kelsey and Kohno's Nostradamus Attack [src](src/set7/challenge54.rs)
+  - [ ] 55. MD4 Collisions [src](src/set7/challenge55.rs)
+  - [ ] 56. RC4 Single-Byte Biases [src](src/set7/challenge56.rs)
 
 # Build
 
