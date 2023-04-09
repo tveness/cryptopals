@@ -63,8 +63,11 @@
 //! the one you just used. Find a pair of messages that collide under both functions. Measure the
 //! total number of calls to the collision function.
 
+use std::collections::HashMap;
+
 use crate::utils::*;
 use openssl::symm::{Cipher, Crypter, Mode};
+use rand::{thread_rng, Rng};
 
 // Crap hash function
 struct Crash {
@@ -103,6 +106,12 @@ impl Crash {
     }
 }
 
+impl Crash {
+    fn from(hash: u16) -> Self {
+        Self { state: hash }
+    }
+}
+
 impl Default for Crash {
     fn default() -> Self {
         let state = 0;
@@ -110,12 +119,99 @@ impl Default for Crash {
     }
 }
 
+fn find_collision(state: u16) -> (Vec<u8>, Vec<u8>) {
+    let mut rng = thread_rng();
+    let mut map = HashMap::<u16, Vec<u8>>::new();
+    // Now go through these blocks in a deterministic fashion
+    loop {
+        let random_block: Vec<u8> = (0..16).map(|_| rng.gen::<u8>()).collect();
+        let mut hasher = Crash::from(state);
+        hasher.update(&random_block);
+        let hash = hasher.finalise();
+        if let Some(old) = map.get(&hash) {
+            if old != &random_block {
+                return (old.to_vec(), random_block);
+            }
+        } else {
+            map.insert(hash, random_block);
+        }
+    }
+}
+
+fn hash(block: &[u8], state: u16) -> u16 {
+    let mut hasher = Crash::from(state);
+    hasher.update(block);
+    hasher.finalise()
+}
+
+fn gen_collision_pairs(initial_state: u16, length: usize) -> Vec<(Vec<u8>, Vec<u8>)> {
+    // Pairs of blocks
+    let mut pairs: Vec<(Vec<u8>, Vec<u8>)> = vec![];
+    let mut states = vec![initial_state];
+    for i in 0..length {
+        // Okay, now how are we going to generate collisions?
+        // First, we find a collision given a particular initial state
+        let pair = find_collision(states[i]);
+
+        //println!("Pair: {:?}", pair);
+
+        let hash0 = hash(&pair.0, states[i]);
+        //println!("Hash0: {}", hash0);
+
+        //let hash1 = hash(&pair.1, states[i]);
+        //println!("Hash1: {}", hash1);
+        //assert_eq!(hash0, hash1);
+
+        pairs.push(pair);
+        states.push(hash0);
+        //println!("States: {:?}", states);
+    }
+    pairs
+}
+
 pub fn main() -> Result<()> {
     let data = b"YELLOW SUBMARINE";
     let mut hasher = Crash::default();
     hasher.update(data);
-    let hash = hasher.finalise();
-    println!("Hash: {}", hash);
+    let hash_val = hasher.finalise();
+    println!("Hash: {}", hash_val);
+
+    let n = 10;
+    let collision_pairs = gen_collision_pairs(0, n);
+    println!("List of colliding pairs: {:?}", collision_pairs);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    #[test]
+    fn test_tree() {
+        let mut rng = thread_rng();
+        let initial_val = rng.gen::<u16>();
+
+        let n = 10;
+        let collision_pairs = gen_collision_pairs(initial_val, n);
+
+        // Pick two random paths through the tree and verify hashes are the same
+        let mut hasher_one = Crash::from(initial_val);
+        let mut hasher_two = Crash::from(initial_val);
+        for i in 0..n {
+            match rng.gen::<bool>() {
+                true => hasher_one.update(&collision_pairs[i].1),
+                false => hasher_one.update(&collision_pairs[i].0),
+            }
+            match rng.gen::<bool>() {
+                true => hasher_two.update(&collision_pairs[i].1),
+                false => hasher_two.update(&collision_pairs[i].0),
+            }
+        }
+
+        let hash_val_one = hasher_one.finalise();
+        let hash_val_two = hasher_two.finalise();
+
+        assert_eq!(hash_val_one, hash_val_two);
+    }
 }
