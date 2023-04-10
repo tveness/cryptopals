@@ -70,17 +70,19 @@ use indicatif::{ProgressBar, ProgressStyle};
 use openssl::symm::{Cipher, Crypter, Mode};
 use rand::{thread_rng, Rng};
 
-trait CrapHasher {
+pub trait CrapHasher {
     /// Updates the inner state with some data
     fn update(&mut self, block: &[u8]);
     /// Consumes the hasher and produces the final output
     fn finalise(self) -> u16;
+    /// Exposes the intermediary state without consuming
+    fn peek(&self) -> u16;
     /// Initialiases hasher with specified state
     fn new(hash: u16) -> Self;
 }
 
 // Crap hash function
-struct Crash {
+pub struct Crash {
     state: u16,
 }
 
@@ -118,6 +120,10 @@ impl CrapHasher for Crash {
 
     // Consumes self in finalising
     fn finalise(self) -> u16 {
+        self.state
+    }
+
+    fn peek(&self) -> u16 {
         self.state
     }
 }
@@ -171,6 +177,9 @@ impl CrapHasher for SlowCrash {
     fn finalise(self) -> u16 {
         self.state
     }
+    fn peek(&self) -> u16 {
+        self.state
+    }
 }
 
 impl Default for SlowCrash {
@@ -199,13 +208,13 @@ fn find_collision<T: CrapHasher>(state: u16) -> (Vec<u8>, Vec<u8>) {
     }
 }
 
-fn hash<T: CrapHasher>(block: &[u8], state: u16) -> u16 {
+pub fn hash<T: CrapHasher>(block: &[u8], state: u16) -> u16 {
     let mut hasher = T::new(state);
     hasher.update(block);
     hasher.finalise()
 }
 
-fn hash_full<T: CrapHasher>(block: &[u8], state: u16) -> u16 {
+pub fn hash_full<T: CrapHasher>(block: &[u8], state: u16) -> u16 {
     let mut hasher = T::new(state);
     for chunk in block.chunks(16) {
         hasher.update(chunk);
