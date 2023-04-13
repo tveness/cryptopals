@@ -13,6 +13,12 @@ use rand::thread_rng;
 
 use crate::utils::*;
 
+pub fn md4_hash(data: &[u8]) -> String {
+    let mut h = Md4Hasher::new();
+    let output = h.hash(data);
+    bytes_to_hex(&output)
+}
+
 /// MD4 implementation according to RFC1186
 /// https://www.rfc-editor.org/rfc/rfc1186
 struct Md4Hasher {
