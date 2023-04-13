@@ -102,6 +102,161 @@ impl Bittable for u32 {
 
 // Copying a lot from challenge 30 where we implemented MD4 (foreshadowing!)
 
+fn check_round1(data: &[u8]) -> bool {
+    // Split the data into the appropriate chunks, again
+    let m: Vec<u32> = data
+        .chunks(4)
+        .map(|x| {
+            let y: Vec<u8> = x.iter().copied().rev().collect();
+            u8s_to_u32(&y)
+        })
+        .collect();
+
+    let n = m.len();
+
+    let mut a: u32 = 0x67452301;
+    let mut b: u32 = 0xefcdab89;
+    let mut c: u32 = 0x98badcfe;
+    let mut d: u32 = 0x10325476;
+    let mut x: Vec<u32> = m.to_vec();
+
+    a = a.wrapping_add(round1(b, c, d, x[0])).rotate_left(3);
+    assert_eq!(a.get_bit(6), b.get_bit(6));
+
+    d = d.wrapping_add(round1(a, b, c, x[1])).rotate_left(7);
+    assert_eq!(d.get_bit(6), 0);
+    assert_eq!(d.get_bit(7), a.get_bit(7));
+    assert_eq!(d.get_bit(10), a.get_bit(10));
+
+    c = c.wrapping_add(round1(d, a, b, x[2])).rotate_left(11);
+    assert_eq!(c.get_bit(6), 1);
+    assert_eq!(c.get_bit(7), 1);
+    assert_eq!(c.get_bit(10), 0);
+    assert_eq!(c.get_bit(25), d.get_bit(25));
+
+    b = b.wrapping_add(round1(c, d, a, x[3])).rotate_left(19);
+
+    assert_eq!(b.get_bit(6), 1);
+    assert_eq!(b.get_bit(7), 0);
+    assert_eq!(b.get_bit(10), 0);
+    assert_eq!(b.get_bit(25), 0);
+
+    // Now update a
+    a = a.wrapping_add(round1(b, c, d, x[4])).rotate_left(3);
+    // And check that the condition applies
+    assert_eq!(a.get_bit(7), 1);
+    assert_eq!(a.get_bit(10), 1);
+    assert_eq!(a.get_bit(25), 0);
+    assert_eq!(a.get_bit(13), b.get_bit(13));
+
+    d = d.wrapping_add(round1(a, b, c, x[5])).rotate_left(7);
+    // And check conditions
+    assert_eq!(d.get_bit(13), 0);
+    assert_eq!(d.get_bit(18), a.get_bit(18));
+    assert_eq!(d.get_bit(19), a.get_bit(19));
+    assert_eq!(d.get_bit(20), a.get_bit(20));
+    assert_eq!(d.get_bit(21), a.get_bit(21));
+    assert_eq!(d.get_bit(25), 1);
+
+    c = c.wrapping_add(round1(d, a, b, x[6])).rotate_left(11);
+    assert_eq!(c.get_bit(12), d.get_bit(12));
+    assert_eq!(c.get_bit(13), 0);
+    assert_eq!(c.get_bit(14), d.get_bit(14));
+    assert_eq!(c.get_bit(18), 0);
+    assert_eq!(c.get_bit(19), 0);
+    assert_eq!(c.get_bit(20), 1);
+    assert_eq!(c.get_bit(21), 0);
+
+    b = b.wrapping_add(round1(c, d, a, x[7])).rotate_left(19);
+
+    assert_eq!(b.get_bit(12), 1);
+    assert_eq!(b.get_bit(13), 1);
+    assert_eq!(b.get_bit(14), 0);
+    assert_eq!(b.get_bit(16), c.get_bit(16));
+    assert_eq!(b.get_bit(18), 0);
+    assert_eq!(b.get_bit(19), 0);
+    assert_eq!(b.get_bit(20), 0);
+    assert_eq!(b.get_bit(21), 0);
+
+    a = a.wrapping_add(round1(b, c, d, x[8])).rotate_left(3);
+    assert_eq!(a.get_bit(12), 1);
+    assert_eq!(a.get_bit(13), 1);
+    assert_eq!(a.get_bit(14), 1);
+    assert_eq!(a.get_bit(16), 0);
+    assert_eq!(a.get_bit(18), 0);
+    assert_eq!(a.get_bit(19), 0);
+    assert_eq!(a.get_bit(20), 0);
+    assert_eq!(a.get_bit(21), 1);
+    assert_eq!(a.get_bit(22), b.get_bit(22));
+    assert_eq!(a.get_bit(25), b.get_bit(25));
+
+    d = d.wrapping_add(round1(a, b, c, x[9])).rotate_left(7);
+    assert_eq!(d.get_bit(12), 1);
+    assert_eq!(d.get_bit(13), 1);
+    assert_eq!(d.get_bit(14), 1);
+    assert_eq!(d.get_bit(16), 0);
+    assert_eq!(d.get_bit(19), 0);
+    assert_eq!(d.get_bit(20), 1);
+    assert_eq!(d.get_bit(21), 1);
+    assert_eq!(d.get_bit(22), 0);
+    assert_eq!(d.get_bit(25), 1);
+    assert_eq!(d.get_bit(29), a.get_bit(29));
+
+    c = c.wrapping_add(round1(d, a, b, x[10])).rotate_left(11);
+    assert_eq!(c.get_bit(16), 1);
+    assert_eq!(c.get_bit(19), 0);
+    assert_eq!(c.get_bit(20), 0);
+    assert_eq!(c.get_bit(21), 0);
+    assert_eq!(c.get_bit(22), 0);
+    assert_eq!(c.get_bit(25), 0);
+    assert_eq!(c.get_bit(29), 1);
+    assert_eq!(c.get_bit(31), d.get_bit(31));
+
+    b = b.wrapping_add(round1(c, d, a, x[11])).rotate_left(19);
+    assert_eq!(b.get_bit(19), 0);
+    assert_eq!(b.get_bit(20), 1);
+    assert_eq!(b.get_bit(21), 1);
+    assert_eq!(b.get_bit(22), c.get_bit(22));
+    assert_eq!(b.get_bit(25), 1);
+    assert_eq!(b.get_bit(29), 0);
+    assert_eq!(b.get_bit(31), 0);
+
+    a = a.wrapping_add(round1(b, c, d, x[12])).rotate_left(3);
+    assert_eq!(a.get_bit(22), 0);
+    assert_eq!(a.get_bit(25), 0);
+    assert_eq!(a.get_bit(26), b.get_bit(26));
+    assert_eq!(a.get_bit(28), b.get_bit(28));
+    assert_eq!(a.get_bit(29), 1);
+    assert_eq!(a.get_bit(31), 0);
+
+    d = d.wrapping_add(round1(a, b, c, x[13])).rotate_left(7);
+    assert_eq!(d.get_bit(22), 0);
+    assert_eq!(d.get_bit(25), 0);
+    assert_eq!(d.get_bit(26), 1);
+    assert_eq!(d.get_bit(28), 1);
+    assert_eq!(d.get_bit(29), 0);
+    assert_eq!(d.get_bit(31), 1);
+
+    c = c.wrapping_add(round1(d, a, b, x[14])).rotate_left(11);
+    assert_eq!(c.get_bit(18), d.get_bit(18));
+    assert_eq!(c.get_bit(22), 1);
+    assert_eq!(c.get_bit(25), 1);
+    assert_eq!(c.get_bit(26), 0);
+    assert_eq!(c.get_bit(28), 0);
+    assert_eq!(c.get_bit(29), 0);
+
+    // b4 b4[18] = 0, b4[25] = c4[25] = 1, b4[26] = 1, b4[28] = 1, b4[29] = 0
+
+    // Set and verify
+    b = b.wrapping_add(round1(c, d, a, x[15])).rotate_left(19);
+    assert_eq!(b.get_bit(18), 0);
+    assert_eq!(b.get_bit(25), c.get_bit(25));
+    assert_eq!(b.get_bit(26), 1);
+    assert_eq!(b.get_bit(28), 1);
+    assert_eq!(b.get_bit(29), 0);
+
+    true
+}
 pub fn massage_round1(data: &[u8]) -> Vec<u8> {
     // Split the data into the appropriate chunks, again
     let m: Vec<u32> = data
@@ -187,10 +342,10 @@ pub fn massage_round1(data: &[u8]) -> Vec<u8> {
     // Set and verify
     b = b.wrapping_add(round1(c, d, a, x[3])).rotate_left(19);
 
-    assert_eq!(b1.get_bit(6), 1);
-    assert_eq!(b1.get_bit(7), 0);
-    assert_eq!(b1.get_bit(10), 0);
-    assert_eq!(b1.get_bit(25), 0);
+    assert_eq!(b.get_bit(6), 1);
+    assert_eq!(b.get_bit(7), 0);
+    assert_eq!(b.get_bit(10), 0);
+    assert_eq!(b.get_bit(25), 0);
 
     // calculate the new value for a[2] in the normal fashion
     let mut a2: u32 = a.wrapping_add(f(b, c, d).wrapping_add(x[4])).rotate_left(3);
@@ -727,11 +882,8 @@ pub fn main() -> Result<()> {
     let message = b"abcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd";
     //    let mut message_massaged = hasher.massage_round2(data)hasher.massage_round1(message);
     let message_massaged = massage_round1(message);
-    // So now we should have a message which is ready for collisions
-    // Let's start flipping some random bits and test for collisions
-    //
-    // Just check that conditions are met
-    assert_eq!(message_massaged, massage_round1(&message_massaged));
+    // Round 1 massaging conditions should hold
+    check_round1(&message_massaged);
 
     let message_hash = md4_hash(&message_massaged);
     let mut tries = 1;
