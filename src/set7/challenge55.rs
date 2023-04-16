@@ -661,7 +661,7 @@ pub fn massage_round1(data: &[u8]) -> Vec<u8> {
     massaged_block
 }
 
-pub fn massage_round2(data: &[u8]) -> Vec<u8> {
+pub fn check_round2(data: &[u8]) -> bool {
     let m: Vec<u32> = data
         .chunks(4)
         .map(|x| {
@@ -690,138 +690,104 @@ pub fn massage_round2(data: &[u8]) -> Vec<u8> {
     // a5 a5[18] = c4[18], a5[25] = 1, a5[26] = 0, a5[28] = 1, a5[31] = 1
     let mut a5 = a.wrapping_add(round2(b, c, d, x[0])).rotate_left(3);
 
-    a5.set_bit(18, &c.get_bit(18));
-    a5.set_bit(25, &1);
-    a5.set_bit(26, &0);
-    a5.set_bit(28, &1);
-    a5.set_bit(31, &1);
-
-    x[0] = a5
-        .rotate_right(3)
-        .wrapping_sub(a)
-        .wrapping_sub(g(b, c, d))
-        .wrapping_sub(0x5a827999);
     a = a.wrapping_add(round2(b, c, d, x[0])).rotate_left(3);
-    assert_eq!(a.get_bit(18), c.get_bit(18));
-    assert_eq!(a.get_bit(25), 1);
-    assert_eq!(a.get_bit(26), 0);
-    assert_eq!(a.get_bit(28), 1);
-    assert_eq!(a.get_bit(31), 1);
+
+    if a.get_bit(18) != c.get_bit(18) {
+        return false;
+    }
+    if a.get_bit(25) != 1 {
+        return false;
+    }
+    if a.get_bit(26) != 0 {
+        return false;
+    }
+    if a.get_bit(28) != 1 {
+        return false;
+    }
+    if a.get_bit(31) != 1 {
+        return false;
+    }
 
     // d5 d5[18] = a5[18], d5[25] = b4[25], d5[26] = b4[26],
     // d5[28] = b4[28], d5[31] = b4[31]
-    let mut d5 = d.wrapping_add(round2(a, b, c, x[4])).rotate_left(5);
-
-    d5.set_bit(18, &a.get_bit(18));
-    d5.set_bit(25, &b.get_bit(25));
-    d5.set_bit(26, &b.get_bit(26));
-    d5.set_bit(28, &b.get_bit(28));
-    d5.set_bit(31, &b.get_bit(31));
-    x[4] = d5
-        .rotate_right(5)
-        .wrapping_sub(d)
-        .wrapping_sub(g(a, b, c))
-        .wrapping_sub(0x5a827999);
 
     d = d.wrapping_add(round2(a, b, c, x[4])).rotate_left(5);
-    assert_eq!(d.get_bit(18), a.get_bit(18));
-    assert_eq!(d.get_bit(25), b.get_bit(25));
-    assert_eq!(d.get_bit(26), b.get_bit(26));
-    assert_eq!(d.get_bit(28), b.get_bit(28));
-    assert_eq!(d.get_bit(31), b.get_bit(31));
+    if d.get_bit(18) != a.get_bit(18) {
+        return false;
+    }
+    if d.get_bit(25) != b.get_bit(25) {
+        return false;
+    }
+    if d.get_bit(26) != b.get_bit(26) {
+        return false;
+    }
+    if d.get_bit(28) != b.get_bit(28) {
+        return false;
+    }
+    if d.get_bit(31) != b.get_bit(31) {
+        return false;
+    }
 
-    // c5 c5[25] = d5[25], c5[26] = d5[26], c5[28] = d5[28],
+    // c5 c5[25] = d5[25], c5[26] =  { return false; }
     // c5[29] = d5[29], c5[31] = d5[31]
-    let mut c5 = c.wrapping_add(round2(d, a, b, x[8])).rotate_left(9);
-    c5.set_bit(25, &d.get_bit(25));
-    c5.set_bit(26, &d.get_bit(26));
-    c5.set_bit(28, &d.get_bit(28));
-    c5.set_bit(29, &d.get_bit(29));
-    c5.set_bit(31, &d.get_bit(31));
 
-    x[8] = c5
-        .rotate_right(9)
-        .wrapping_sub(c)
-        .wrapping_sub(g(d, a, b))
-        .wrapping_sub(0x5a827999);
     c = c.wrapping_add(round2(d, a, b, x[8])).rotate_left(9);
-    assert_eq!(c.get_bit(25), d.get_bit(25));
-    assert_eq!(c.get_bit(26), d.get_bit(26));
-    assert_eq!(c.get_bit(28), d.get_bit(28));
-    assert_eq!(c.get_bit(29), d.get_bit(29));
-    assert_eq!(c.get_bit(31), d.get_bit(31));
-
-    // b5 b5[28] = c5[28], b5[29] = 1, b5[31] = 0
-    let mut b5 = b.wrapping_add(round2(c, d, a, x[12])).rotate_left(13);
-
-    b5.set_bit(28, &c.get_bit(28));
-    b5.set_bit(29, &1);
-    b5.set_bit(31, &0);
-
-    x[12] = b5
-        .rotate_right(13)
-        .wrapping_sub(b)
-        .wrapping_sub(g(c, d, a))
-        .wrapping_sub(0x5a827999);
+    if c.get_bit(25) != d.get_bit(25) {
+        return false;
+    }
+    if c.get_bit(26) != d.get_bit(26) {
+        return false;
+    }
+    if c.get_bit(28) != d.get_bit(28) {
+        return false;
+    }
+    if c.get_bit(29) != d.get_bit(29) {
+        return false;
+    }
+    if c.get_bit(31) != d.get_bit(31) {
+        return false;
+    }
 
     b = b.wrapping_add(round2(c, d, a, x[12])).rotate_left(13);
-    assert_eq!(b.get_bit(28), c.get_bit(28));
-    assert_eq!(b.get_bit(29), 1);
-    assert_eq!(b.get_bit(31), 0);
+    if b.get_bit(28) != c.get_bit(28) {
+        return false;
+    }
+    if b.get_bit(29) != 1 {
+        return false;
+    }
+    if b.get_bit(31) != 0 {
+        return false;
+    }
 
     // a6 a6[28] = 1, a6[31] = 1
-    let mut a6 = a.wrapping_add(round2(b, c, d, x[1])).rotate_left(3);
-
-    a6.set_bit(28, &1);
-    a6.set_bit(31, &1);
-
-    x[1] = a6
-        .rotate_right(3)
-        .wrapping_sub(a)
-        .wrapping_sub(g(b, c, d))
-        .wrapping_sub(0x5a827999);
     a = a.wrapping_add(round2(b, c, d, x[1])).rotate_left(3);
-    assert_eq!(a.get_bit(28), 1);
-    assert_eq!(a.get_bit(31), 1);
+    if a.get_bit(28) != 1 {
+        return false;
+    }
+    if a.get_bit(31) != 1 {
+        return false;
+    }
 
     // d6 d6[28] = b5[28]
-    let mut d6 = d.wrapping_add(round2(a, b, c, x[5])).rotate_left(5);
-
-    d6.set_bit(28, &b.get_bit(28));
-    x[5] = d6
-        .rotate_right(5)
-        .wrapping_sub(d)
-        .wrapping_sub(g(a, b, c))
-        .wrapping_sub(0x5a827999);
-
     d = d.wrapping_add(round2(a, b, c, x[5])).rotate_left(5);
-    assert_eq!(d.get_bit(28), b.get_bit(28));
+    if d.get_bit(28) != b.get_bit(28) {
+        return false;
+    }
 
     // c6 c6[28] = d6[28], c6[29] = d6[29] + 1, c6[31] = d6[31] + 1
-
-    let mut c6 = c.wrapping_add(round2(d, a, b, x[9])).rotate_left(9);
-    c6.set_bit(28, &d.get_bit(28));
-    c6.set_bit(29, &((d.get_bit(29) + 1) % 2));
-    c6.set_bit(31, &((d.get_bit(31) + 1) % 2));
-
-    x[9] = c6
-        .rotate_right(9)
-        .wrapping_sub(c)
-        .wrapping_sub(g(d, a, b))
-        .wrapping_sub(0x5a827999);
     c = c.wrapping_add(round2(d, a, b, x[9])).rotate_left(9);
-    assert_eq!(c.get_bit(28), d.get_bit(28));
-    assert_eq!(c.get_bit(29), ((d.get_bit(29) + 1) % 2));
-    assert_eq!(c.get_bit(31), ((d.get_bit(31) + 1) % 2));
-
-    // Round 2 massage complete!
-    let mut massaged_block: Vec<u8> = vec![];
-    for b in x[..16].iter() {
-        for byte in u32_to_u8s(*b).iter().rev() {
-            massaged_block.push(*byte);
-        }
+    if c.get_bit(28) != d.get_bit(28) {
+        return false;
     }
-    massaged_block
+    if c.get_bit(29) != ((d.get_bit(29) + 1) % 2) {
+        return false;
+    }
+    if c.get_bit(31) != ((d.get_bit(31) + 1) % 2) {
+        return false;
+    }
+
+    // Round 2 check complete!
+    true
 }
 
 fn round1(x: u32, y: u32, z: u32, xx: u32) -> u32 {
@@ -846,7 +812,7 @@ fn h(x: u32, y: u32, z: u32) -> u32 {
 
 fn full_massage(data: &[u8]) -> Vec<u8> {
     let mut massaged_data = data.to_vec();
-    let mut new_massaged_data = massage_round2(&massage_round1(&massaged_data));
+    let mut new_massaged_data = massage_round1(&massaged_data);
     let mut loops = 1;
     loop {
         // Second round conditions must be true
@@ -857,7 +823,7 @@ fn full_massage(data: &[u8]) -> Vec<u8> {
             return new_massaged_data;
         }
         std::mem::swap(&mut new_massaged_data, &mut massaged_data);
-        new_massaged_data = massage_round2(&massage_round1(&massaged_data));
+        new_massaged_data = massage_round1(&massaged_data);
     }
 }
 
@@ -865,8 +831,9 @@ fn flip_a_few(data: &[u8]) -> Vec<u8> {
     let mut rng = thread_rng();
     // Pick between 1 and 8 bits to flip
     let num_of_bits = 1 + (rng.gen::<usize>() % 8);
+    // Copy the input data
     let mut flipped = data.to_vec();
-    for b in 0..num_of_bits {
+    for _ in 0..num_of_bits {
         // Select a byte
         let byte = rng.gen::<usize>() % data.len();
         let bit = rng.gen::<usize>() % 8;
