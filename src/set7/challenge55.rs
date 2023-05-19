@@ -41,7 +41,7 @@
 //!
 //! Implement Wang's attack.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use indicatif::ProgressBar;
 use rand::{thread_rng, Rng};
@@ -661,7 +661,150 @@ pub fn massage_round1(data: &[u8]) -> Vec<u8> {
     massaged_block
 }
 
-pub fn check_round2(data: &[u8]) -> bool {
+pub fn massage_round2(data: &[u8], corrections: Vec<Corrections>) -> Vec<u8> {
+    let m: Vec<u32> = data
+        .chunks(4)
+        .map(|x| {
+            let y: Vec<u8> = x.iter().copied().rev().collect();
+            u8s_to_u32(&y)
+        })
+        .collect();
+
+    // Reset to canonical values
+    let mut a: u32 = 0x67452301;
+    let mut b: u32 = 0xefcdab89;
+    let mut c: u32 = 0x98badcfe;
+    let mut d: u32 = 0x10325476;
+
+    let mut x: Vec<u32> = m[..16].to_vec();
+    // Round 1
+
+    // Table 1, row 1
+
+    /*
+    if corrections.contains(&Corrections::A5i18) {
+        let bit = 1 << (19 - 4);
+        // xor with 1 flips this bit
+        x[0] = x[0] ^ bit;
+    }
+    if corrections.contains(&Corrections::A5i25) {
+        let bit = 1 << (26 - 4);
+        x[0] = x[0] ^ bit;
+    }
+    if corrections.contains(&Corrections::A5i26) {
+        let bit = 1 << (27 - 4);
+        x[0] = x[0] ^ bit;
+    }
+    */
+    if corrections.contains(&Corrections::A5i28) {
+        let bit = 1 << (29 - 4);
+        x[0] = x[0] ^ bit;
+    }
+    /*
+    if corrections.contains(&Corrections::A5i31) {
+        let bit = 1 << (32 - 4);
+        x[0] = x[0] ^ bit;
+    }
+    */
+
+    a = a.wrapping_add(round1(b, c, d, x[0])).rotate_left(3);
+
+    // Table 1, row 2
+    if corrections.contains(&Corrections::A5i18)
+        || corrections.contains(&Corrections::A5i25)
+        || corrections.contains(&Corrections::A5i26)
+        || corrections.contains(&Corrections::A5i28)
+        || corrections.contains(&Corrections::A5i31)
+    {
+        let d1 = d.wrapping_add(round1(a, b, c, x[0 + 1])).rotate_left(7);
+        x[1] = d1.rotate_right(7).wrapping_sub(d).wrapping_sub(f(a, b, c));
+    }
+    d = d.wrapping_add(round1(a, b, c, x[0 + 1])).rotate_left(7);
+
+    // Table 1, row 3
+    if corrections.contains(&Corrections::A5i18)
+        || corrections.contains(&Corrections::A5i25)
+        || corrections.contains(&Corrections::A5i26)
+        || corrections.contains(&Corrections::A5i28)
+        || corrections.contains(&Corrections::A5i31)
+    {
+        let c1 = c.wrapping_add(round1(d, a, b, x[0 + 2])).rotate_left(11);
+        x[2] = c1.rotate_right(11).wrapping_sub(c).wrapping_sub(f(d, a, b));
+    }
+    c = c.wrapping_add(round1(d, a, b, x[0 + 2])).rotate_left(11);
+
+    // Table 1, row 4
+
+    if corrections.contains(&Corrections::A5i18)
+        || corrections.contains(&Corrections::A5i25)
+        || corrections.contains(&Corrections::A5i26)
+        || corrections.contains(&Corrections::A5i28)
+        || corrections.contains(&Corrections::A5i31)
+    {
+        let b1 = b.wrapping_add(round1(c, d, a, x[0 + 3])).rotate_left(19);
+        x[3] = b1.rotate_right(19).wrapping_sub(b).wrapping_sub(f(c, d, a));
+    }
+    b = b.wrapping_add(round1(c, d, a, x[0 + 3])).rotate_left(19);
+
+    // Table 1, row 5
+    if corrections.contains(&Corrections::A5i18)
+        || corrections.contains(&Corrections::A5i25)
+        || corrections.contains(&Corrections::A5i26)
+        || corrections.contains(&Corrections::A5i28)
+        || corrections.contains(&Corrections::A5i31)
+    {
+        let a2 = a.wrapping_add(round1(b, c, d, x[4])).rotate_left(3);
+        x[4] = a2.rotate_right(3).wrapping_sub(a).wrapping_sub(f(b, c, d));
+    }
+    a = a.wrapping_add(round1(b, c, d, x[4])).rotate_left(3);
+
+    let m: Vec<u32> = data
+        .chunks(4)
+        .map(|x| {
+            let y: Vec<u8> = x.iter().copied().rev().collect();
+            u8s_to_u32(&y)
+        })
+        .collect();
+    let mut massaged_block: Vec<u8> = vec![];
+    for b in x[..16].iter() {
+        for byte in u32_to_u8s(*b).iter().rev() {
+            massaged_block.push(*byte);
+        }
+    }
+    massaged_block
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum Corrections {
+    A5i18,
+    A5i25,
+    A5i26,
+    A5i28,
+    A5i31,
+    D5i18,
+    D5i25,
+    D5i26,
+    D5i28,
+    D5i31,
+    C5i25,
+    C5i26,
+    C5i28,
+    C5i29,
+    C5i31,
+    B5i28,
+    B5i29,
+    B5i31,
+    A6i28,
+    A6i31,
+    D6i28,
+    C6i28,
+    C6i29,
+    C6i31,
+}
+
+pub fn check_round2(data: &[u8]) -> Vec<Corrections> {
+    let mut set = HashSet::new();
+
     let m: Vec<u32> = data
         .chunks(4)
         .map(|x| {
@@ -677,7 +820,7 @@ pub fn check_round2(data: &[u8]) -> bool {
     let mut c: u32 = 0x98badcfe;
     let mut d: u32 = 0x10325476;
 
-    let mut x: Vec<u32> = m[..16].to_vec();
+    let x: Vec<u32> = m[..16].to_vec();
     // Round 1
     for &o in &[0, 4, 8, 12] {
         a = a.wrapping_add(round1(b, c, d, x[o])).rotate_left(3);
@@ -688,24 +831,22 @@ pub fn check_round2(data: &[u8]) -> bool {
 
     // Now we must ensure the round two conditions
     // a5 a5[18] = c4[18], a5[25] = 1, a5[26] = 0, a5[28] = 1, a5[31] = 1
-    let mut a5 = a.wrapping_add(round2(b, c, d, x[0])).rotate_left(3);
-
     a = a.wrapping_add(round2(b, c, d, x[0])).rotate_left(3);
 
     if a.get_bit(18) != c.get_bit(18) {
-        return false;
+        set.insert(Corrections::A5i18);
     }
     if a.get_bit(25) != 1 {
-        return false;
+        set.insert(Corrections::A5i25);
     }
     if a.get_bit(26) != 0 {
-        return false;
+        set.insert(Corrections::A5i26);
     }
     if a.get_bit(28) != 1 {
-        return false;
+        set.insert(Corrections::A5i28);
     }
     if a.get_bit(31) != 1 {
-        return false;
+        set.insert(Corrections::A5i31);
     }
 
     // d5 d5[18] = a5[18], d5[25] = b4[25], d5[26] = b4[26],
@@ -713,19 +854,19 @@ pub fn check_round2(data: &[u8]) -> bool {
 
     d = d.wrapping_add(round2(a, b, c, x[4])).rotate_left(5);
     if d.get_bit(18) != a.get_bit(18) {
-        return false;
+        set.insert(Corrections::D5i18);
     }
     if d.get_bit(25) != b.get_bit(25) {
-        return false;
+        set.insert(Corrections::D5i25);
     }
     if d.get_bit(26) != b.get_bit(26) {
-        return false;
+        set.insert(Corrections::D5i26);
     }
     if d.get_bit(28) != b.get_bit(28) {
-        return false;
+        set.insert(Corrections::D5i28);
     }
     if d.get_bit(31) != b.get_bit(31) {
-        return false;
+        set.insert(Corrections::D5i31);
     }
 
     // c5 c5[25] = d5[25], c5[26] =  { return false; }
@@ -733,61 +874,61 @@ pub fn check_round2(data: &[u8]) -> bool {
 
     c = c.wrapping_add(round2(d, a, b, x[8])).rotate_left(9);
     if c.get_bit(25) != d.get_bit(25) {
-        return false;
+        set.insert(Corrections::C5i25);
     }
     if c.get_bit(26) != d.get_bit(26) {
-        return false;
+        set.insert(Corrections::C5i26);
     }
     if c.get_bit(28) != d.get_bit(28) {
-        return false;
+        set.insert(Corrections::C5i28);
     }
     if c.get_bit(29) != d.get_bit(29) {
-        return false;
+        set.insert(Corrections::C5i29);
     }
     if c.get_bit(31) != d.get_bit(31) {
-        return false;
+        set.insert(Corrections::C5i31);
     }
 
     b = b.wrapping_add(round2(c, d, a, x[12])).rotate_left(13);
     if b.get_bit(28) != c.get_bit(28) {
-        return false;
+        set.insert(Corrections::B5i28);
     }
     if b.get_bit(29) != 1 {
-        return false;
+        set.insert(Corrections::B5i29);
     }
     if b.get_bit(31) != 0 {
-        return false;
+        set.insert(Corrections::B5i31);
     }
 
     // a6 a6[28] = 1, a6[31] = 1
     a = a.wrapping_add(round2(b, c, d, x[1])).rotate_left(3);
     if a.get_bit(28) != 1 {
-        return false;
+        set.insert(Corrections::A6i28);
     }
     if a.get_bit(31) != 1 {
-        return false;
+        set.insert(Corrections::A6i31);
     }
 
     // d6 d6[28] = b5[28]
     d = d.wrapping_add(round2(a, b, c, x[5])).rotate_left(5);
     if d.get_bit(28) != b.get_bit(28) {
-        return false;
+        set.insert(Corrections::D6i28);
     }
 
     // c6 c6[28] = d6[28], c6[29] = d6[29] + 1, c6[31] = d6[31] + 1
     c = c.wrapping_add(round2(d, a, b, x[9])).rotate_left(9);
     if c.get_bit(28) != d.get_bit(28) {
-        return false;
+        set.insert(Corrections::C6i28);
     }
     if c.get_bit(29) != ((d.get_bit(29) + 1) % 2) {
-        return false;
+        set.insert(Corrections::C6i29);
     }
     if c.get_bit(31) != ((d.get_bit(31) + 1) % 2) {
-        return false;
+        set.insert(Corrections::C6i31);
     }
 
     // Round 2 check complete!
-    true
+    set.into_iter().collect()
 }
 
 fn round1(x: u32, y: u32, z: u32, xx: u32) -> u32 {
@@ -848,9 +989,20 @@ fn flip_a_few(data: &[u8]) -> Vec<u8> {
 pub fn main() -> Result<()> {
     let message = b"abcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd";
     //    let mut message_massaged = hasher.massage_round2(data)hasher.massage_round1(message);
-    let message_massaged = massage_round1(message);
+    let mut message_massaged = massage_round1(message);
     // Round 1 massaging conditions should hold
     check_round1(&message_massaged);
+
+    // Check round 2 problems
+    let corrections = check_round2(&message_massaged);
+    println!("Corrections: {:?}", corrections);
+    // Now try to correct them
+    message_massaged = massage_round2(&message_massaged, corrections);
+    let corrections = check_round2(&message_massaged);
+    println!("New corrections: {:?}", corrections);
+    check_round1(&message_massaged);
+
+    /*
 
     let message_hash = md4_hash(&message_massaged);
     let mut tries = 1;
@@ -870,6 +1022,7 @@ pub fn main() -> Result<()> {
             break;
         }
     }
+    */
 
     Ok(())
 }
