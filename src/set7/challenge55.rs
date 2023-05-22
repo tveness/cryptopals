@@ -111,13 +111,11 @@ fn check_round1(data: &[u8]) -> bool {
         })
         .collect();
 
-    let n = m.len();
-
     let mut a: u32 = 0x67452301;
     let mut b: u32 = 0xefcdab89;
     let mut c: u32 = 0x98badcfe;
     let mut d: u32 = 0x10325476;
-    let mut x: Vec<u32> = m.to_vec();
+    let x: Vec<u32> = m.to_vec();
 
     a = a.wrapping_add(round1(b, c, d, x[0])).rotate_left(3);
     assert_eq!(a.get_bit(6), b.get_bit(6));
@@ -675,17 +673,23 @@ pub fn massage_round2(data: &[u8], corrections: Vec<Corrections>) -> Vec<u8> {
     let mut c: u32 = 0x98badcfe;
     let mut d: u32 = 0x10325476;
 
+    let mut a_p: u32 = 0x67452301;
+    let mut b_p: u32 = 0xefcdab89;
+    let mut c_p: u32 = 0x98badcfe;
+    let mut d_p: u32 = 0x10325476;
+
     let mut x: Vec<u32> = m[..16].to_vec();
+    let mut x_p: Vec<u32> = m[..16].to_vec();
     // Round 1
 
     // Table 1, row 1
 
-    /*
     if corrections.contains(&Corrections::A5i18) {
         let bit = 1 << (19 - 4);
         // xor with 1 flips this bit
-        x[0] = x[0] ^ bit;
+        x_p[0] = x_p[0] ^ bit;
     }
+    /*
     if corrections.contains(&Corrections::A5i25) {
         let bit = 1 << (26 - 4);
         x[0] = x[0] ^ bit;
@@ -694,12 +698,10 @@ pub fn massage_round2(data: &[u8], corrections: Vec<Corrections>) -> Vec<u8> {
         let bit = 1 << (27 - 4);
         x[0] = x[0] ^ bit;
     }
-    */
     if corrections.contains(&Corrections::A5i28) {
         let bit = 1 << (29 - 4);
         x[0] = x[0] ^ bit;
     }
-    /*
     if corrections.contains(&Corrections::A5i31) {
         let bit = 1 << (32 - 4);
         x[0] = x[0] ^ bit;
@@ -707,6 +709,7 @@ pub fn massage_round2(data: &[u8], corrections: Vec<Corrections>) -> Vec<u8> {
     */
 
     a = a.wrapping_add(round1(b, c, d, x[0])).rotate_left(3);
+    a_p = a_p.wrapping_add(round1(b, c, d, x_p[0])).rotate_left(3);
 
     // Table 1, row 2
     if corrections.contains(&Corrections::A5i18)
@@ -716,9 +719,20 @@ pub fn massage_round2(data: &[u8], corrections: Vec<Corrections>) -> Vec<u8> {
         || corrections.contains(&Corrections::A5i31)
     {
         let d1 = d.wrapping_add(round1(a, b, c, x[0 + 1])).rotate_left(7);
-        x[1] = d1.rotate_right(7).wrapping_sub(d).wrapping_sub(f(a, b, c));
+        x_p[1] = d1
+            .rotate_right(7)
+            .wrapping_sub(d)
+            .wrapping_sub(f(a_p, b, c));
     }
-    d = d.wrapping_add(round1(a, b, c, x[0 + 1])).rotate_left(7);
+    println!(
+        "Original d1: {}",
+        d.wrapping_add(round1(a, b, c, x[0 + 1])).rotate_left(7)
+    );
+    println!(
+        "Modified d1: {}",
+        d.wrapping_add(round1(a_p, b, c, x_p[0 + 1])).rotate_left(7)
+    );
+    d = d.wrapping_add(round1(a_p, b, c, x[0 + 1])).rotate_left(7);
 
     // Table 1, row 3
     if corrections.contains(&Corrections::A5i18)
@@ -728,9 +742,14 @@ pub fn massage_round2(data: &[u8], corrections: Vec<Corrections>) -> Vec<u8> {
         || corrections.contains(&Corrections::A5i31)
     {
         let c1 = c.wrapping_add(round1(d, a, b, x[0 + 2])).rotate_left(11);
-        x[2] = c1.rotate_right(11).wrapping_sub(c).wrapping_sub(f(d, a, b));
+        x_p[2] = c1
+            .rotate_right(11)
+            .wrapping_sub(c)
+            .wrapping_sub(f(d, a_p, b));
     }
-    c = c.wrapping_add(round1(d, a, b, x[0 + 2])).rotate_left(11);
+    c = c
+        .wrapping_add(round1(d, a_p, b, x_p[0 + 2]))
+        .rotate_left(11);
 
     // Table 1, row 4
 
@@ -741,9 +760,14 @@ pub fn massage_round2(data: &[u8], corrections: Vec<Corrections>) -> Vec<u8> {
         || corrections.contains(&Corrections::A5i31)
     {
         let b1 = b.wrapping_add(round1(c, d, a, x[0 + 3])).rotate_left(19);
-        x[3] = b1.rotate_right(19).wrapping_sub(b).wrapping_sub(f(c, d, a));
+        x_p[3] = b1
+            .rotate_right(19)
+            .wrapping_sub(b)
+            .wrapping_sub(f(c, d, a_p));
     }
-    b = b.wrapping_add(round1(c, d, a, x[0 + 3])).rotate_left(19);
+    b = b
+        .wrapping_add(round1(c, d, a_p, x_p[0 + 3]))
+        .rotate_left(19);
 
     // Table 1, row 5
     if corrections.contains(&Corrections::A5i18)
@@ -753,7 +777,10 @@ pub fn massage_round2(data: &[u8], corrections: Vec<Corrections>) -> Vec<u8> {
         || corrections.contains(&Corrections::A5i31)
     {
         let a2 = a.wrapping_add(round1(b, c, d, x[4])).rotate_left(3);
-        x[4] = a2.rotate_right(3).wrapping_sub(a).wrapping_sub(f(b, c, d));
+        x_p[4] = a2
+            .rotate_right(3)
+            .wrapping_sub(a_p)
+            .wrapping_sub(f(b, c, d));
     }
     a = a.wrapping_add(round1(b, c, d, x[4])).rotate_left(3);
 
@@ -765,7 +792,7 @@ pub fn massage_round2(data: &[u8], corrections: Vec<Corrections>) -> Vec<u8> {
         })
         .collect();
     let mut massaged_block: Vec<u8> = vec![];
-    for b in x[..16].iter() {
+    for b in x_p[..16].iter() {
         for byte in u32_to_u8s(*b).iter().rev() {
             massaged_block.push(*byte);
         }
@@ -986,7 +1013,7 @@ fn flip_a_few(data: &[u8]) -> Vec<u8> {
 }
 
 pub fn main() -> Result<()> {
-    let message = b"abcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd";
+    let message = b"zzzzabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdacd";
     //    let mut message_massaged = hasher.massage_round2(data)hasher.massage_round1(message);
     let mut message_massaged = massage_round1(message);
     // Round 1 massaging conditions should hold
