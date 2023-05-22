@@ -2,7 +2,6 @@
 //!
 //! MD4 is a 128-bit cryptographic hash function, meaning it should take a work factor of roughly
 //! 2^64 to find collisions.
-//!
 //! It turns out we can do much better.
 //!
 //! The paper "Cryptanalysis of the Hash Functions MD4 and RIPEMD" by Wang et al details a
@@ -992,6 +991,7 @@ pub fn main() -> Result<()> {
     let mut message_massaged = massage_round1(message);
     // Round 1 massaging conditions should hold
     check_round1(&message_massaged);
+    println!("Initial round 1 passed");
 
     // Check round 2 problems
     let corrections = check_round2(&message_massaged);
@@ -1001,6 +1001,7 @@ pub fn main() -> Result<()> {
     let corrections = check_round2(&message_massaged);
     println!("New corrections: {:?}", corrections);
     check_round1(&message_massaged);
+    println!("Round 2 corrections did not mess up round 1 conditions");
 
     /*
 
