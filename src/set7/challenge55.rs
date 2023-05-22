@@ -658,7 +658,7 @@ pub fn massage_round1(data: &[u8]) -> Vec<u8> {
     massaged_block
 }
 
-pub fn massage_round2(data: &[u8], corrections: Vec<Corrections>) -> Vec<u8> {
+pub fn massage_a5_round2(data: &[u8], corrections: &[Corrections], tofix: Corrections) -> Vec<u8> {
     let m: Vec<u32> = data
         .chunks(4)
         .map(|x| {
@@ -674,39 +674,34 @@ pub fn massage_round2(data: &[u8], corrections: Vec<Corrections>) -> Vec<u8> {
     let mut d: u32 = 0x10325476;
 
     let mut a_p: u32 = 0x67452301;
-    let mut b_p: u32 = 0xefcdab89;
-    let mut c_p: u32 = 0x98badcfe;
-    let mut d_p: u32 = 0x10325476;
 
-    let mut x: Vec<u32> = m[..16].to_vec();
+    let x: Vec<u32> = m[..16].to_vec();
     let mut x_p: Vec<u32> = m[..16].to_vec();
     // Round 1
 
     // Table 1, row 1
 
-    if corrections.contains(&Corrections::A5i18) {
+    if corrections.contains(&Corrections::A5i18) && tofix == Corrections::A5i18 {
         let bit = 1 << (19 - 4);
         // xor with 1 flips this bit
         x_p[0] = x_p[0] ^ bit;
     }
-    /*
-    if corrections.contains(&Corrections::A5i25) {
+    if corrections.contains(&Corrections::A5i25) && tofix == Corrections::A5i25 {
         let bit = 1 << (26 - 4);
-        x[0] = x[0] ^ bit;
+        x_p[0] = x_p[0] ^ bit;
     }
-    if corrections.contains(&Corrections::A5i26) {
+    if corrections.contains(&Corrections::A5i26) && tofix == Corrections::A5i26 {
         let bit = 1 << (27 - 4);
-        x[0] = x[0] ^ bit;
+        x_p[0] = x_p[0] ^ bit;
     }
-    if corrections.contains(&Corrections::A5i28) {
+    if corrections.contains(&Corrections::A5i28) && tofix == Corrections::A5i28 {
         let bit = 1 << (29 - 4);
-        x[0] = x[0] ^ bit;
+        x_p[0] = x_p[0] ^ bit;
     }
-    if corrections.contains(&Corrections::A5i31) {
+    if corrections.contains(&Corrections::A5i31) && tofix == Corrections::A5i31 {
         let bit = 1 << (32 - 4);
-        x[0] = x[0] ^ bit;
+        x_p[0] = x_p[0] ^ bit;
     }
-    */
 
     a = a.wrapping_add(round1(b, c, d, x[0])).rotate_left(3);
     a_p = a_p.wrapping_add(round1(b, c, d, x_p[0])).rotate_left(3);
@@ -724,14 +719,6 @@ pub fn massage_round2(data: &[u8], corrections: Vec<Corrections>) -> Vec<u8> {
             .wrapping_sub(d)
             .wrapping_sub(f(a_p, b, c));
     }
-    println!(
-        "Original d1: {}",
-        d.wrapping_add(round1(a, b, c, x[0 + 1])).rotate_left(7)
-    );
-    println!(
-        "Modified d1: {}",
-        d.wrapping_add(round1(a_p, b, c, x_p[0 + 1])).rotate_left(7)
-    );
     d = d.wrapping_add(round1(a_p, b, c, x[0 + 1])).rotate_left(7);
 
     // Table 1, row 3
@@ -782,15 +769,9 @@ pub fn massage_round2(data: &[u8], corrections: Vec<Corrections>) -> Vec<u8> {
             .wrapping_sub(a_p)
             .wrapping_sub(f(b, c, d));
     }
-    a = a.wrapping_add(round1(b, c, d, x[4])).rotate_left(3);
 
-    let m: Vec<u32> = data
-        .chunks(4)
-        .map(|x| {
-            let y: Vec<u8> = x.iter().copied().rev().collect();
-            u8s_to_u32(&y)
-        })
-        .collect();
+    //a = a.wrapping_add(round1(b, c, d, x[4])).rotate_left(3);
+
     let mut massaged_block: Vec<u8> = vec![];
     for b in x_p[..16].iter() {
         for byte in u32_to_u8s(*b).iter().rev() {
@@ -1021,16 +1002,22 @@ pub fn main() -> Result<()> {
     println!("Initial round 1 passed");
 
     // Check round 2 problems
-    let corrections = check_round2(&message_massaged);
+    let mut corrections = check_round2(&message_massaged);
     println!("Corrections: {:?}", corrections);
     // Now try to correct them
-    message_massaged = massage_round2(&message_massaged, corrections);
-    let corrections = check_round2(&message_massaged);
-    println!("New corrections: {:?}", corrections);
+    message_massaged = massage_a5_round2(&message_massaged, &corrections, Corrections::A5i18);
+    corrections = check_round2(&message_massaged);
+    message_massaged = massage_a5_round2(&message_massaged, &corrections, Corrections::A5i25);
+    corrections = check_round2(&message_massaged);
+    message_massaged = massage_a5_round2(&message_massaged, &corrections, Corrections::A5i26);
+    corrections = check_round2(&message_massaged);
+    message_massaged = massage_a5_round2(&message_massaged, &corrections, Corrections::A5i28);
+    corrections = check_round2(&message_massaged);
+    message_massaged = massage_a5_round2(&message_massaged, &corrections, Corrections::A5i31);
+    corrections = check_round2(&message_massaged);
+    println!("New corrections (As removed): {:?}", corrections);
     check_round1(&message_massaged);
     println!("Round 2 corrections did not mess up round 1 conditions");
-
-    /*
 
     let message_hash = md4_hash(&message_massaged);
     let mut tries = 1;
@@ -1050,7 +1037,6 @@ pub fn main() -> Result<()> {
             break;
         }
     }
-    */
 
     Ok(())
 }
