@@ -40,8 +40,9 @@
 //!
 //! Implement Wang's attack.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
+use hex;
 use indicatif::ProgressBar;
 use rand::{thread_rng, Rng};
 
@@ -263,8 +264,6 @@ pub fn massage_round1(data: &[u8]) -> Vec<u8> {
             u8s_to_u32(&y)
         })
         .collect();
-
-    let n = m.len();
 
     let mut a: u32 = 0x67452301;
     let mut b: u32 = 0xefcdab89;
@@ -642,13 +641,6 @@ pub fn massage_round1(data: &[u8]) -> Vec<u8> {
     assert_eq!(b.get_bit(28), 1);
     assert_eq!(b.get_bit(29), 0);
 
-    let m: Vec<u32> = data
-        .chunks(4)
-        .map(|x| {
-            let y: Vec<u8> = x.iter().copied().rev().collect();
-            u8s_to_u32(&y)
-        })
-        .collect();
     let mut massaged_block: Vec<u8> = vec![];
     for b in x[..16].iter() {
         for byte in u32_to_u8s(*b).iter().rev() {
@@ -792,7 +784,6 @@ pub fn check_round2(data: &[u8]) -> Vec<Corrections> {
             u8s_to_u32(&y)
         })
         .collect();
-    let n = m.len();
 
     // Reset to canonical values
     let mut a: u32 = 0x67452301;
@@ -917,53 +908,12 @@ fn round1(x: u32, y: u32, z: u32, xx: u32) -> u32 {
 fn round2(x: u32, y: u32, z: u32, xx: u32) -> u32 {
     g(x, y, z).wrapping_add(xx).wrapping_add(0x5a827999)
 }
-fn round3(x: u32, y: u32, z: u32, xx: u32) -> u32 {
-    h(x, y, z).wrapping_add(xx).wrapping_add(0x6ed9eba1)
-}
 
 fn f(x: u32, y: u32, z: u32) -> u32 {
     (x & y) | ((!x) & z)
 }
 fn g(x: u32, y: u32, z: u32) -> u32 {
     (x & y) | (x & z) | (y & z)
-}
-fn h(x: u32, y: u32, z: u32) -> u32 {
-    x ^ y ^ z
-}
-
-fn full_massage(data: &[u8]) -> Vec<u8> {
-    let mut massaged_data = data.to_vec();
-    let mut new_massaged_data = massage_round1(&massaged_data);
-    let mut loops = 1;
-    loop {
-        // Second round conditions must be true
-        // But have they changed round 1 conditions?
-        println!("Loops: {loops}");
-        loops += 1;
-        if massage_round1(&new_massaged_data) == new_massaged_data {
-            return new_massaged_data;
-        }
-        std::mem::swap(&mut new_massaged_data, &mut massaged_data);
-        new_massaged_data = massage_round1(&massaged_data);
-    }
-}
-
-fn flip_a_few(data: &[u8]) -> Vec<u8> {
-    let mut rng = thread_rng();
-    // Pick between 1 and 8 bits to flip
-    let num_of_bits = 1 + (rng.gen::<usize>() % 8);
-    // Copy the input data
-    let mut flipped = data.to_vec();
-    for _ in 0..num_of_bits {
-        // Select a byte
-        let byte = rng.gen::<usize>() % data.len();
-        let bit = rng.gen::<usize>() % 8;
-        let shifted_bit = 1 << bit;
-        // ^ 1 inverts
-        // ^ 0 stays the same
-        flipped[byte] ^= shifted_bit;
-    }
-    flipped
 }
 
 fn generate_md4_candidate_pair() -> (Vec<u8>, Vec<u8>) {
@@ -998,11 +948,11 @@ fn generate_md4_candidate_pair() -> (Vec<u8>, Vec<u8>) {
     }
     if corrections.contains(&Corrections::A5i31) {
         message = massage_a5_round2(&message, Corrections::A5i31);
-        corrections = check_round2(&message);
+        //corrections = check_round2(&message);
     }
     //println!("Post-post-massage: {}", bytes_to_hex(&message));
     message = massage_round1(&message);
-    corrections = check_round2(&message);
+    //corrections = check_round2(&message);
     //println!("New corrections (A5s removed): {:?}", corrections);
     check_round1(&message);
 
@@ -1053,7 +1003,14 @@ pub fn main() -> Result<()> {
         if hash == hash_p && message != message_p {
             spinner.finish();
             println!("Original: {}", bytes_to_hex(&message));
-            println!("Flipped:  {}", bytes_to_hex(&message_p));
+            print!("Flipped:  ");
+            for (i, b) in message_p.iter().enumerate() {
+                match message[i] == *b {
+                    true => print!("{}", hex::encode([*b])),
+                    false => print!("\x1b[91m{}\x1b[0m", hex::encode([*b])),
+                }
+            }
+            println!();
             println!("Hash: {}", hash);
             break;
         }
