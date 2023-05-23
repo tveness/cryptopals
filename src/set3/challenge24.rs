@@ -142,7 +142,7 @@ mod tests {
             let total = mts
                 .take(4)
                 .enumerate()
-                .map(|(i, v)| (v as u32) << (3 - i) * 8)
+                .map(|(i, v)| (v as u32) << ((3 - i) * 8))
                 .sum::<u32>();
 
             let first = Mt::seed(seed).next().unwrap();

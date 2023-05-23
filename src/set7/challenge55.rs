@@ -93,8 +93,8 @@ impl Bittable for u32 {
         // x^1 = !x
         let shift_val = 1 << bit;
         match val {
-            0x01 => *self = *self | shift_val,
-            0x00 => *self = *self & !shift_val,
+            0x01 => *self |= shift_val,
+            0x00 => *self &= !shift_val,
             _ => unreachable!(),
         };
     }
@@ -675,23 +675,23 @@ pub fn massage_a5_round2(data: &[u8], tofix: Corrections) -> Vec<u8> {
         Corrections::A5i18 => {
             let bit = 1 << (18 - 3);
             // xor with 1 flips this bit
-            x_p[0] = x_p[0] ^ bit;
+            x_p[0] ^= bit;
         }
         Corrections::A5i25 => {
             let bit = 1 << (25 - 3);
-            x_p[0] = x_p[0] ^ bit;
+            x_p[0] ^= bit;
         }
         Corrections::A5i26 => {
             let bit = 1 << (26 - 3);
-            x_p[0] = x_p[0] ^ bit;
+            x_p[0] ^= bit;
         }
         Corrections::A5i28 => {
             let bit = 1 << (28 - 3);
-            x_p[0] = x_p[0] ^ bit;
+            x_p[0] ^= bit;
         }
         Corrections::A5i31 => {
             let bit = 1 << (31 - 3);
-            x_p[0] = x_p[0] ^ bit;
+            x_p[0] ^= bit;
         }
         _ => panic!("Trying to fix something we can't do here"),
     }
@@ -700,32 +700,32 @@ pub fn massage_a5_round2(data: &[u8], tofix: Corrections) -> Vec<u8> {
     a_p = a_p.wrapping_add(round1(b, c, d, x_p[0])).rotate_left(3);
 
     // Table 1, row 2
-    let d1 = d.wrapping_add(round1(a, b, c, x[0 + 1])).rotate_left(7);
+    let d1 = d.wrapping_add(round1(a, b, c, x[1])).rotate_left(7);
     x_p[1] = d1
         .rotate_right(7)
         .wrapping_sub(d)
         .wrapping_sub(f(a_p, b, c));
-    d = d.wrapping_add(round1(a_p, b, c, x[0 + 1])).rotate_left(7);
+    d = d.wrapping_add(round1(a_p, b, c, x[1])).rotate_left(7);
 
     // Table 1, row 3
-    let c1 = c.wrapping_add(round1(d, a, b, x[0 + 2])).rotate_left(11);
+    let c1 = c.wrapping_add(round1(d, a, b, x[2])).rotate_left(11);
     x_p[2] = c1
         .rotate_right(11)
         .wrapping_sub(c)
         .wrapping_sub(f(d, a_p, b));
     c = c
-        .wrapping_add(round1(d, a_p, b, x_p[0 + 2]))
+        .wrapping_add(round1(d, a_p, b, x_p[2]))
         .rotate_left(11);
 
     // Table 1, row 4
 
-    let b1 = b.wrapping_add(round1(c, d, a, x[0 + 3])).rotate_left(19);
+    let b1 = b.wrapping_add(round1(c, d, a, x[3])).rotate_left(19);
     x_p[3] = b1
         .rotate_right(19)
         .wrapping_sub(b)
         .wrapping_sub(f(c, d, a_p));
     b = b
-        .wrapping_add(round1(c, d, a_p, x_p[0 + 3]))
+        .wrapping_add(round1(c, d, a_p, x_p[3]))
         .rotate_left(19);
 
     // Table 1, row 5

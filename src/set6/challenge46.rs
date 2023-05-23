@@ -175,12 +175,12 @@ mod tests {
         // n = 187
 
         let public_key = Key {
-            key: e.clone(),
+            key: e,
             modulus: n.clone(),
         };
         let private_key = Key {
-            key: d.clone(),
-            modulus: n.clone(),
+            key: d,
+            modulus: n,
         };
         for secret_num in 0..187 {
             let secret_num: BigInt = secret_num.into();

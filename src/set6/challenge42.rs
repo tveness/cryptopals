@@ -145,8 +145,8 @@ mod tests {
         let e: BigInt = 3.into();
         let (et, n) = et_n(1024, &e);
         let d = invmod(&e, &et);
-        let public_key = (e.clone(), n.clone());
-        let private_key = (d, n.clone());
+        let public_key = (e, n.clone());
+        let private_key = (d, n);
 
         let message = b"hi mom";
         let signed = sign(&private_key, message);
