@@ -681,24 +681,24 @@ pub fn massage_a5_round2(data: &[u8], tofix: Corrections) -> Vec<u8> {
     // Table 1, row 1
     match tofix {
         Corrections::A5i18 => {
-            let bit = 1 << (19 - 4);
+            let bit = 1 << (18 - 3);
             // xor with 1 flips this bit
             x_p[0] = x_p[0] ^ bit;
         }
         Corrections::A5i25 => {
-            let bit = 1 << (26 - 4);
+            let bit = 1 << (25 - 3);
             x_p[0] = x_p[0] ^ bit;
         }
         Corrections::A5i26 => {
-            let bit = 1 << (27 - 4);
+            let bit = 1 << (26 - 3);
             x_p[0] = x_p[0] ^ bit;
         }
         Corrections::A5i28 => {
-            let bit = 1 << (29 - 4);
+            let bit = 1 << (28 - 3);
             x_p[0] = x_p[0] ^ bit;
         }
         Corrections::A5i31 => {
-            let bit = 1 << (32 - 4);
+            let bit = 1 << (31 - 3);
             x_p[0] = x_p[0] ^ bit;
         }
         _ => panic!("Trying to fix something we can't do here"),
@@ -970,13 +970,15 @@ fn generate_md4_candidate_pair() -> (Vec<u8>, Vec<u8>) {
     let mut rng = thread_rng();
 
     let mut message: Vec<u8> = (0..64).map(|_| rng.gen::<u8>()).collect();
+    //println!("Pre-massage: {}", bytes_to_hex(&message));
 
     message = massage_round1(&message);
+    //println!("Post-massage: {}", bytes_to_hex(&message));
     // Round 1 massaging conditions should hold
     check_round1(&message);
     // Check round 2 problems
     let mut corrections = check_round2(&message);
-    println!("Corrections: {:?}", corrections);
+    //println!("Corrections: {:?}", corrections);
     // Now try to correct them
     if corrections.contains(&Corrections::A5i18) {
         message = massage_a5_round2(&message, Corrections::A5i18);
@@ -998,18 +1000,38 @@ fn generate_md4_candidate_pair() -> (Vec<u8>, Vec<u8>) {
         message = massage_a5_round2(&message, Corrections::A5i31);
         corrections = check_round2(&message);
     }
-    println!("New corrections (As removed): {:?}", corrections);
+    //println!("Post-post-massage: {}", bytes_to_hex(&message));
+    message = massage_round1(&message);
+    corrections = check_round2(&message);
+    //println!("New corrections (A5s removed): {:?}", corrections);
     check_round1(&message);
 
-    let mut message_p = flip_bits(&message);
+    let message_p = flip_bits(&message);
 
     (message, message_p)
 }
 
 fn flip_bits(message: &[u8]) -> Vec<u8> {
-    let mut message = message.clone();
+    // Split the data into the appropriate chunks, again
+    let mut x: Vec<u32> = message
+        .chunks(4)
+        .map(|x| {
+            let y: Vec<u8> = x.iter().copied().rev().collect();
+            u8s_to_u32(&y)
+        })
+        .collect();
 
-    message.to_vec()
+    x[1] = x[1].wrapping_add(1 << 31);
+    x[2] = x[2].wrapping_add((1 << 31) - (1 << 28));
+    x[12] = x[12].wrapping_sub(1 << 16);
+
+    let mut output: Vec<u8> = vec![];
+    for b in x[..16].iter() {
+        for byte in u32_to_u8s(*b).iter().rev() {
+            output.push(*byte);
+        }
+    }
+    output
 }
 
 pub fn main() -> Result<()> {
@@ -1024,6 +1046,9 @@ pub fn main() -> Result<()> {
         let (message, message_p) = generate_md4_candidate_pair();
         let hash = md4_hash(&message);
         let hash_p = md4_hash(&message_p);
+        //println!("try:   {}", tries);
+        //println!("h:   {}", bytes_to_hex(&message));
+        //println!("h':  {}", bytes_to_hex(&message_p));
 
         if hash == hash_p && message != message_p {
             spinner.finish();
