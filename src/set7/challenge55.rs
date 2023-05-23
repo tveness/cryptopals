@@ -658,7 +658,7 @@ pub fn massage_round1(data: &[u8]) -> Vec<u8> {
     massaged_block
 }
 
-pub fn massage_a5_round2(data: &[u8], corrections: &[Corrections], tofix: Corrections) -> Vec<u8> {
+pub fn massage_a5_round2(data: &[u8], tofix: Corrections) -> Vec<u8> {
     let m: Vec<u32> = data
         .chunks(4)
         .map(|x| {
@@ -669,106 +669,79 @@ pub fn massage_a5_round2(data: &[u8], corrections: &[Corrections], tofix: Correc
 
     // Reset to canonical values
     let mut a: u32 = 0x67452301;
+    let mut a_p: u32 = 0x67452301;
     let mut b: u32 = 0xefcdab89;
     let mut c: u32 = 0x98badcfe;
     let mut d: u32 = 0x10325476;
-
-    let mut a_p: u32 = 0x67452301;
 
     let x: Vec<u32> = m[..16].to_vec();
     let mut x_p: Vec<u32> = m[..16].to_vec();
     // Round 1
 
     // Table 1, row 1
-
-    if corrections.contains(&Corrections::A5i18) && tofix == Corrections::A5i18 {
-        let bit = 1 << (19 - 4);
-        // xor with 1 flips this bit
-        x_p[0] = x_p[0] ^ bit;
-    }
-    if corrections.contains(&Corrections::A5i25) && tofix == Corrections::A5i25 {
-        let bit = 1 << (26 - 4);
-        x_p[0] = x_p[0] ^ bit;
-    }
-    if corrections.contains(&Corrections::A5i26) && tofix == Corrections::A5i26 {
-        let bit = 1 << (27 - 4);
-        x_p[0] = x_p[0] ^ bit;
-    }
-    if corrections.contains(&Corrections::A5i28) && tofix == Corrections::A5i28 {
-        let bit = 1 << (29 - 4);
-        x_p[0] = x_p[0] ^ bit;
-    }
-    if corrections.contains(&Corrections::A5i31) && tofix == Corrections::A5i31 {
-        let bit = 1 << (32 - 4);
-        x_p[0] = x_p[0] ^ bit;
+    match tofix {
+        Corrections::A5i18 => {
+            let bit = 1 << (19 - 4);
+            // xor with 1 flips this bit
+            x_p[0] = x_p[0] ^ bit;
+        }
+        Corrections::A5i25 => {
+            let bit = 1 << (26 - 4);
+            x_p[0] = x_p[0] ^ bit;
+        }
+        Corrections::A5i26 => {
+            let bit = 1 << (27 - 4);
+            x_p[0] = x_p[0] ^ bit;
+        }
+        Corrections::A5i28 => {
+            let bit = 1 << (29 - 4);
+            x_p[0] = x_p[0] ^ bit;
+        }
+        Corrections::A5i31 => {
+            let bit = 1 << (32 - 4);
+            x_p[0] = x_p[0] ^ bit;
+        }
+        _ => panic!("Trying to fix something we can't do here"),
     }
 
     a = a.wrapping_add(round1(b, c, d, x[0])).rotate_left(3);
     a_p = a_p.wrapping_add(round1(b, c, d, x_p[0])).rotate_left(3);
 
     // Table 1, row 2
-    if corrections.contains(&Corrections::A5i18)
-        || corrections.contains(&Corrections::A5i25)
-        || corrections.contains(&Corrections::A5i26)
-        || corrections.contains(&Corrections::A5i28)
-        || corrections.contains(&Corrections::A5i31)
-    {
-        let d1 = d.wrapping_add(round1(a, b, c, x[0 + 1])).rotate_left(7);
-        x_p[1] = d1
-            .rotate_right(7)
-            .wrapping_sub(d)
-            .wrapping_sub(f(a_p, b, c));
-    }
+    let d1 = d.wrapping_add(round1(a, b, c, x[0 + 1])).rotate_left(7);
+    x_p[1] = d1
+        .rotate_right(7)
+        .wrapping_sub(d)
+        .wrapping_sub(f(a_p, b, c));
     d = d.wrapping_add(round1(a_p, b, c, x[0 + 1])).rotate_left(7);
 
     // Table 1, row 3
-    if corrections.contains(&Corrections::A5i18)
-        || corrections.contains(&Corrections::A5i25)
-        || corrections.contains(&Corrections::A5i26)
-        || corrections.contains(&Corrections::A5i28)
-        || corrections.contains(&Corrections::A5i31)
-    {
-        let c1 = c.wrapping_add(round1(d, a, b, x[0 + 2])).rotate_left(11);
-        x_p[2] = c1
-            .rotate_right(11)
-            .wrapping_sub(c)
-            .wrapping_sub(f(d, a_p, b));
-    }
+    let c1 = c.wrapping_add(round1(d, a, b, x[0 + 2])).rotate_left(11);
+    x_p[2] = c1
+        .rotate_right(11)
+        .wrapping_sub(c)
+        .wrapping_sub(f(d, a_p, b));
     c = c
         .wrapping_add(round1(d, a_p, b, x_p[0 + 2]))
         .rotate_left(11);
 
     // Table 1, row 4
 
-    if corrections.contains(&Corrections::A5i18)
-        || corrections.contains(&Corrections::A5i25)
-        || corrections.contains(&Corrections::A5i26)
-        || corrections.contains(&Corrections::A5i28)
-        || corrections.contains(&Corrections::A5i31)
-    {
-        let b1 = b.wrapping_add(round1(c, d, a, x[0 + 3])).rotate_left(19);
-        x_p[3] = b1
-            .rotate_right(19)
-            .wrapping_sub(b)
-            .wrapping_sub(f(c, d, a_p));
-    }
+    let b1 = b.wrapping_add(round1(c, d, a, x[0 + 3])).rotate_left(19);
+    x_p[3] = b1
+        .rotate_right(19)
+        .wrapping_sub(b)
+        .wrapping_sub(f(c, d, a_p));
     b = b
         .wrapping_add(round1(c, d, a_p, x_p[0 + 3]))
         .rotate_left(19);
 
     // Table 1, row 5
-    if corrections.contains(&Corrections::A5i18)
-        || corrections.contains(&Corrections::A5i25)
-        || corrections.contains(&Corrections::A5i26)
-        || corrections.contains(&Corrections::A5i28)
-        || corrections.contains(&Corrections::A5i31)
-    {
-        let a2 = a.wrapping_add(round1(b, c, d, x[4])).rotate_left(3);
-        x_p[4] = a2
-            .rotate_right(3)
-            .wrapping_sub(a_p)
-            .wrapping_sub(f(b, c, d));
-    }
+    let a2 = a.wrapping_add(round1(b, c, d, x[4])).rotate_left(3);
+    x_p[4] = a2
+        .rotate_right(3)
+        .wrapping_sub(a_p)
+        .wrapping_sub(f(b, c, d));
 
     //a = a.wrapping_add(round1(b, c, d, x[4])).rotate_left(3);
 
@@ -993,33 +966,53 @@ fn flip_a_few(data: &[u8]) -> Vec<u8> {
     flipped
 }
 
-pub fn main() -> Result<()> {
-    let message = b"zzzzabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdacd";
-    //    let mut message_massaged = hasher.massage_round2(data)hasher.massage_round1(message);
-    let mut message_massaged = massage_round1(message);
-    // Round 1 massaging conditions should hold
-    check_round1(&message_massaged);
-    println!("Initial round 1 passed");
+fn generate_md4_candidate_pair() -> (Vec<u8>, Vec<u8>) {
+    let mut rng = thread_rng();
 
+    let mut message: Vec<u8> = (0..64).map(|_| rng.gen::<u8>()).collect();
+
+    message = massage_round1(&message);
+    // Round 1 massaging conditions should hold
+    check_round1(&message);
     // Check round 2 problems
-    let mut corrections = check_round2(&message_massaged);
+    let mut corrections = check_round2(&message);
     println!("Corrections: {:?}", corrections);
     // Now try to correct them
-    message_massaged = massage_a5_round2(&message_massaged, &corrections, Corrections::A5i18);
-    corrections = check_round2(&message_massaged);
-    message_massaged = massage_a5_round2(&message_massaged, &corrections, Corrections::A5i25);
-    corrections = check_round2(&message_massaged);
-    message_massaged = massage_a5_round2(&message_massaged, &corrections, Corrections::A5i26);
-    corrections = check_round2(&message_massaged);
-    message_massaged = massage_a5_round2(&message_massaged, &corrections, Corrections::A5i28);
-    corrections = check_round2(&message_massaged);
-    message_massaged = massage_a5_round2(&message_massaged, &corrections, Corrections::A5i31);
-    corrections = check_round2(&message_massaged);
+    if corrections.contains(&Corrections::A5i18) {
+        message = massage_a5_round2(&message, Corrections::A5i18);
+        corrections = check_round2(&message);
+    }
+    if corrections.contains(&Corrections::A5i25) {
+        message = massage_a5_round2(&message, Corrections::A5i25);
+        corrections = check_round2(&message);
+    }
+    if corrections.contains(&Corrections::A5i26) {
+        message = massage_a5_round2(&message, Corrections::A5i26);
+        corrections = check_round2(&message);
+    }
+    if corrections.contains(&Corrections::A5i28) {
+        message = massage_a5_round2(&message, Corrections::A5i28);
+        corrections = check_round2(&message);
+    }
+    if corrections.contains(&Corrections::A5i31) {
+        message = massage_a5_round2(&message, Corrections::A5i31);
+        corrections = check_round2(&message);
+    }
     println!("New corrections (As removed): {:?}", corrections);
-    check_round1(&message_massaged);
-    println!("Round 2 corrections did not mess up round 1 conditions");
+    check_round1(&message);
 
-    let message_hash = md4_hash(&message_massaged);
+    let mut message_p = flip_bits(&message);
+
+    (message, message_p)
+}
+
+fn flip_bits(message: &[u8]) -> Vec<u8> {
+    let mut message = message.clone();
+
+    message.to_vec()
+}
+
+pub fn main() -> Result<()> {
     let mut tries = 1;
     let spinner = ProgressBar::new_spinner();
     spinner.set_message(format!("Tries: {}", tries));
@@ -1027,13 +1020,16 @@ pub fn main() -> Result<()> {
         spinner.set_message(format!("Tries: {}", tries));
         spinner.tick();
         tries += 1;
-        let flipped = flip_a_few(&message_massaged);
-        let flipped_hash = md4_hash(&flipped);
-        if flipped_hash == message_hash && flipped != message_massaged {
-            println!("Original: {}", bytes_to_hex(&message_massaged));
-            println!("Flipped:  {}", bytes_to_hex(&flipped));
-            println!("Hash: {}", flipped_hash);
+
+        let (message, message_p) = generate_md4_candidate_pair();
+        let hash = md4_hash(&message);
+        let hash_p = md4_hash(&message_p);
+
+        if hash == hash_p && message != message_p {
             spinner.finish();
+            println!("Original: {}", bytes_to_hex(&message));
+            println!("Flipped:  {}", bytes_to_hex(&message_p));
+            println!("Hash: {}", hash);
             break;
         }
     }
