@@ -705,7 +705,7 @@ pub fn massage_a5_round2(data: &[u8], tofix: Corrections) -> Vec<u8> {
         .rotate_right(7)
         .wrapping_sub(d)
         .wrapping_sub(f(a_p, b, c));
-    d = d.wrapping_add(round1(a_p, b, c, x[1])).rotate_left(7);
+    d = d.wrapping_add(round1(a_p, b, c, x_p[1])).rotate_left(7);
 
     // Table 1, row 3
     let c1 = c.wrapping_add(round1(d, a, b, x[2])).rotate_left(11);
@@ -713,9 +713,7 @@ pub fn massage_a5_round2(data: &[u8], tofix: Corrections) -> Vec<u8> {
         .rotate_right(11)
         .wrapping_sub(c)
         .wrapping_sub(f(d, a_p, b));
-    c = c
-        .wrapping_add(round1(d, a_p, b, x_p[2]))
-        .rotate_left(11);
+    c = c.wrapping_add(round1(d, a_p, b, x_p[2])).rotate_left(11);
 
     // Table 1, row 4
 
@@ -724,9 +722,7 @@ pub fn massage_a5_round2(data: &[u8], tofix: Corrections) -> Vec<u8> {
         .rotate_right(19)
         .wrapping_sub(b)
         .wrapping_sub(f(c, d, a_p));
-    b = b
-        .wrapping_add(round1(c, d, a_p, x_p[3]))
-        .rotate_left(19);
+    b = b.wrapping_add(round1(c, d, a_p, x_p[3])).rotate_left(19);
 
     // Table 1, row 5
     let a2 = a.wrapping_add(round1(b, c, d, x[4])).rotate_left(3);
@@ -951,7 +947,7 @@ fn generate_md4_candidate_pair() -> (Vec<u8>, Vec<u8>) {
         //corrections = check_round2(&message);
     }
     //println!("Post-post-massage: {}", bytes_to_hex(&message));
-    message = massage_round1(&message);
+    //message = massage_round1(&message);
     //corrections = check_round2(&message);
     //println!("New corrections (A5s removed): {:?}", corrections);
     check_round1(&message);
