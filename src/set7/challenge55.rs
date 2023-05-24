@@ -1166,4 +1166,10 @@ mod tests {
         x.set_bit(1, &0x00);
         assert_eq!(x, 0x04);
     }
+
+    #[ignore = "slow"]
+    #[test]
+    fn md4_collision() {
+        main().unwrap();
+    }
 }
