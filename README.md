@@ -97,16 +97,16 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
 </details>
 
 - [ ] Set 8, Abstract algebra
-  - [ ] 57. Diffie-Hellman Revisited: Small Subgroup Confinement [src](src/set8/challegnge57.rs)
-  - [ ] 58. Pollard's Method for Catching Kangaroos [src](src/set8/challegnge58.rs)
-  - [ ] 59. Elliptic Curve Diffie-Hellman and Invalid-Curve Attacks [src](src/set8/challegnge59.rs)
-  - [ ] 60. Single-Coordinate Ladders and Insecure Twists [src](src/set8/challegnge60.rs)
-  - [ ] 61. Duplicate-Signature Key Selection in ECDSA (and RSA) [src](src/set8/challegnge61.rs)
-  - [ ] 62. Key-Recovery Attacks on ECDSA with Biased Nonces [src](src/set8/challegnge62.rs)
-  - [ ] 63. Key-Recovery Attacks on GCM with Repeated Nonces [src](src/set8/challegnge63.rs)
-  - [ ] 64. Key-Recovery Attacks on GCM with a Truncated MAC [src](src/set8/challegnge64.rs)
-  - [ ] 65. Truncated-MAC GCM Revisited: Improving the Key-Recovery Attack via Ciphertext Length Extension [src](src/set8/challegnge65.rs)
-  - [ ] 66. Exploiting Implementation Errors in Diffie-Hellman [src](src/set8/challegnge66.rs)
+  - [ ] 57. Diffie-Hellman Revisited: Small Subgroup Confinement [src](src/set8/challenge57.rs)
+  - [ ] 58. Pollard's Method for Catching Kangaroos [src](src/set8/challenge58.rs)
+  - [ ] 59. Elliptic Curve Diffie-Hellman and Invalid-Curve Attacks [src](src/set8/challenge59.rs)
+  - [ ] 60. Single-Coordinate Ladders and Insecure Twists [src](src/set8/challenge60.rs)
+  - [ ] 61. Duplicate-Signature Key Selection in ECDSA (and RSA) [src](src/set8/challenge61.rs)
+  - [ ] 62. Key-Recovery Attacks on ECDSA with Biased Nonces [src](src/set8/challenge62.rs)
+  - [ ] 63. Key-Recovery Attacks on GCM with Repeated Nonces [src](src/set8/challenge63.rs)
+  - [ ] 64. Key-Recovery Attacks on GCM with a Truncated MAC [src](src/set8/challenge64.rs)
+  - [ ] 65. Truncated-MAC GCM Revisited: Improving the Key-Recovery Attack via Ciphertext Length Extension [src](src/set8/challenge65.rs)
+  - [ ] 66. Exploiting Implementation Errors in Diffie-Hellman [src](src/set8/challenge66.rs)
 
 # Build
 
