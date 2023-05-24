@@ -15,6 +15,7 @@ mod set4;
 mod set5;
 mod set6;
 mod set7;
+mod set8;
 mod stream;
 mod utils;
 
@@ -42,6 +43,7 @@ fn main() -> Result<()> {
         c @ 33..=40 => set5::run(c),
         c @ 41..=48 => set6::run(c),
         c @ 49..=56 => set7::run(c),
+        c @ 57..=66 => set8::run(c),
         _ => Err(anyhow!("Invalid challenge number")),
     }?;
     Ok(())

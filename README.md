@@ -86,15 +86,27 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
 <details>
 <summary>✅ Set 7, Hashes</summary>
 
-  - ✅ 49. CBC-MAC Message Forgery [src](src/set7/challenge49.rs)
-  - ✅ 50. Hashing with CBC-MAC [src](src/set7/challenge50.rs)
-  - ✅ 51. Compression Ratio Side-Channel Attacks [src](src/set7/challenge51.rs)
-  - ✅ 52. Iterated Hash Function Multicollisions [src](src/set7/challenge52.rs)
-  - ✅ 53. Kelsey and Schneier's Expandable Messages [src](src/set7/challenge53.rs)
-  - ✅ 54. Kelsey and Kohno's Nostradamus Attack [src](src/set7/challenge54.rs)
-  - ✅ 55. MD4 Collisions [src](src/set7/challenge55.rs)
-  - ✅ 56. RC4 Single-Byte Biases [src](src/set7/challenge56.rs)
+- ✅ 49. CBC-MAC Message Forgery [src](src/set7/challenge49.rs)
+- ✅ 50. Hashing with CBC-MAC [src](src/set7/challenge50.rs)
+- ✅ 51. Compression Ratio Side-Channel Attacks [src](src/set7/challenge51.rs)
+- ✅ 52. Iterated Hash Function Multicollisions [src](src/set7/challenge52.rs)
+- ✅ 53. Kelsey and Schneier's Expandable Messages [src](src/set7/challenge53.rs)
+- ✅ 54. Kelsey and Kohno's Nostradamus Attack [src](src/set7/challenge54.rs)
+- ✅ 55. MD4 Collisions [src](src/set7/challenge55.rs)
+- ✅ 56. RC4 Single-Byte Biases [src](src/set7/challenge56.rs)
 </details>
+
+- [ ] Set 8, Abstract algebra
+  - [ ] 57. Diffie-Hellman Revisited: Small Subgroup Confinement [src](src/set8/challegnge57.rs)
+  - [ ] 58. Pollard's Method for Catching Kangaroos [src](src/set8/challegnge58.rs)
+  - [ ] 59. Elliptic Curve Diffie-Hellman and Invalid-Curve Attacks [src](src/set8/challegnge59.rs)
+  - [ ] 60. Single-Coordinate Ladders and Insecure Twists [src](src/set8/challegnge60.rs)
+  - [ ] 61. Duplicate-Signature Key Selection in ECDSA (and RSA) [src](src/set8/challegnge61.rs)
+  - [ ] 62. Key-Recovery Attacks on ECDSA with Biased Nonces [src](src/set8/challegnge62.rs)
+  - [ ] 63. Key-Recovery Attacks on GCM with Repeated Nonces [src](src/set8/challegnge63.rs)
+  - [ ] 64. Key-Recovery Attacks on GCM with a Truncated MAC [src](src/set8/challegnge64.rs)
+  - [ ] 65. Truncated-MAC GCM Revisited: Improving the Key-Recovery Attack via Ciphertext Length Extension [src](src/set8/challegnge65.rs)
+  - [ ] 66. Exploiting Implementation Errors in Diffie-Hellman [src](src/set8/challegnge66.rs)
 
 # Build
 
