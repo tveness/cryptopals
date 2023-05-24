@@ -649,6 +649,125 @@ pub fn massage_round1(data: &[u8]) -> Vec<u8> {
     }
     massaged_block
 }
+pub fn massage_d5_round2(data: &[u8], tofix: Corrections) -> Vec<u8> {
+    let m: Vec<u32> = data
+        .chunks(4)
+        .map(|x| {
+            let y: Vec<u8> = x.iter().copied().rev().collect();
+            u8s_to_u32(&y)
+        })
+        .collect();
+
+    // Reset to canonical values
+    let mut a: u32 = 0x67452301;
+    let mut a_p: u32 = 0x67452301;
+    let mut b: u32 = 0xefcdab89;
+    let mut c: u32 = 0x98badcfe;
+    let mut d: u32 = 0x10325476;
+
+    let x: Vec<u32> = m[..16].to_vec();
+    let mut x_p: Vec<u32> = m[..16].to_vec();
+    // Round 1
+
+    // Table 1, row 1
+    match tofix {
+        Corrections::D5i18 => {
+            let bit = 1 << (18 - 5);
+            // xor with 1 flips this bit
+            x_p[4] ^= bit;
+        }
+        Corrections::D5i25 => {
+            let bit = 1 << (25 - 5);
+            x_p[4] ^= bit;
+        }
+        Corrections::D5i26 => {
+            let bit = 1 << (26 - 5);
+            x_p[4] ^= bit;
+        }
+        Corrections::D5i28 => {
+            let bit = 1 << (28 - 5);
+            x_p[4] ^= bit;
+        }
+        Corrections::D5i31 => {
+            let bit = 1 << (31 - 5);
+            x_p[4] ^= bit;
+        }
+        _ => panic!("Trying to fix something we can't do here"),
+    }
+    // First have to do a complete round
+
+    a = a.wrapping_add(round1(b, c, d, x[0])).rotate_left(3);
+    a_p = a_p.wrapping_add(round1(b, c, d, x_p[0])).rotate_left(3);
+
+    d = d.wrapping_add(round1(a, b, c, x[1])).rotate_left(7);
+    c = c.wrapping_add(round1(d, a, b, x[2])).rotate_left(11);
+    b = b.wrapping_add(round1(c, d, a, x[3])).rotate_left(19);
+
+    // Onto round 1 part 2
+    // i.e. a2
+    a = a.wrapping_add(round1(b, c, d, x[4])).rotate_left(3);
+    // This is where the first different will occur,
+    // as x[4] is what gets modified
+    // a2'
+    a_p = a_p.wrapping_add(round1(b, c, d, x_p[4])).rotate_left(3);
+    //println!("a2:  {}", a);
+    //println!("a2': {}", a_p);
+
+    // Table 1, row 2
+    let d2 = d.wrapping_add(round1(a, b, c, x[5])).rotate_left(7);
+    x_p[5] = d2
+        .rotate_right(7)
+        .wrapping_sub(d)
+        .wrapping_sub(f(a_p, b, c));
+    d = d.wrapping_add(round1(a_p, b, c, x_p[5])).rotate_left(7);
+    assert_eq!(d2, d);
+
+    //println!("d2:  {}", d2);
+    //println!("d2': {}", d);
+
+    // Table 1, row 3
+    let c2 = c.wrapping_add(round1(d, a, b, x[6])).rotate_left(11);
+    x_p[6] = c2
+        .rotate_right(11)
+        .wrapping_sub(c)
+        .wrapping_sub(f(d, a_p, b));
+    c = c.wrapping_add(round1(d, a_p, b, x_p[6])).rotate_left(11);
+    assert_eq!(c2, c);
+
+    //println!("c2:  {}", c2);
+    //println!("c2': {}", c);
+    // Table 1, row 4
+
+    let b2 = b.wrapping_add(round1(c, d, a, x[7])).rotate_left(19);
+    x_p[7] = b2
+        .rotate_right(19)
+        .wrapping_sub(b)
+        .wrapping_sub(f(c, d, a_p));
+    b = b.wrapping_add(round1(c, d, a_p, x_p[7])).rotate_left(19);
+    assert_eq!(b2, b);
+    //println!("b2:  {}", b2);
+    //println!("b2': {}", b);
+
+    // Table 1, row 5
+    let a3 = a.wrapping_add(round1(b, c, d, x[8])).rotate_left(3);
+    x_p[8] = a3
+        .rotate_right(3)
+        .wrapping_sub(a_p)
+        .wrapping_sub(f(b, c, d));
+
+    a = a_p.wrapping_add(round1(b, c, d, x_p[8])).rotate_left(3);
+    assert_eq!(a3, a);
+    //println!("a3:   {}", a3);
+    //println!("a3':  {}", a);
+
+    let mut massaged_block: Vec<u8> = vec![];
+    for b in x_p[..16].iter() {
+        for byte in u32_to_u8s(*b).iter().rev() {
+            massaged_block.push(*byte);
+        }
+    }
+    massaged_block
+}
 
 pub fn massage_a5_round2(data: &[u8], tofix: Corrections) -> Vec<u8> {
     let m: Vec<u32> = data
@@ -926,6 +1045,7 @@ fn generate_md4_candidate_pair() -> (Vec<u8>, Vec<u8>) {
     let mut corrections = check_round2(&message);
     //println!("Corrections: {:?}", corrections);
     // Now try to correct them
+    // A5 corrections
     if corrections.contains(&Corrections::A5i18) {
         message = massage_a5_round2(&message, Corrections::A5i18);
         corrections = check_round2(&message);
@@ -944,12 +1064,41 @@ fn generate_md4_candidate_pair() -> (Vec<u8>, Vec<u8>) {
     }
     if corrections.contains(&Corrections::A5i31) {
         message = massage_a5_round2(&message, Corrections::A5i31);
-        //corrections = check_round2(&message);
+        corrections = check_round2(&message);
     }
     //println!("Post-post-massage: {}", bytes_to_hex(&message));
     //message = massage_round1(&message);
     //corrections = check_round2(&message);
     //println!("New corrections (A5s removed): {:?}", corrections);
+    check_round1(&message);
+
+    // D5 corrections
+    if corrections.contains(&Corrections::D5i18) {
+        message = massage_d5_round2(&message, Corrections::D5i18);
+        corrections = check_round2(&message);
+    }
+    //println!("New corrections (D5i18 removed): {:?}", corrections);
+    if corrections.contains(&Corrections::D5i25) {
+        message = massage_d5_round2(&message, Corrections::D5i25);
+        corrections = check_round2(&message);
+    }
+    if corrections.contains(&Corrections::D5i26) {
+        message = massage_d5_round2(&message, Corrections::D5i26);
+        corrections = check_round2(&message);
+    }
+    if corrections.contains(&Corrections::D5i28) {
+        message = massage_d5_round2(&message, Corrections::D5i28);
+        corrections = check_round2(&message);
+    }
+    if corrections.contains(&Corrections::D5i31) {
+        message = massage_d5_round2(&message, Corrections::D5i31);
+        //corrections = check_round2(&message);
+    }
+    //println!("New corrections (A5s and D5s removed): {:?}", corrections);
+    //println!("Post-post-massage: {}", bytes_to_hex(&message));
+    //message = massage_round1(&message);
+    //corrections = check_round2(&message);
+    message = massage_round1(&message);
     check_round1(&message);
 
     let message_p = flip_bits(&message);
