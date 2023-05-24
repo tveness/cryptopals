@@ -1191,5 +1191,6 @@ mod tests {
             }
             tries += 1;
         }
+        panic!("Didn't find a collision");
     }
 }
