@@ -1,5 +1,11 @@
 use anyhow::{anyhow, Result};
-use clap::Parser;
+const HELP: &str = "
+USAGE:
+    -c [CHALLENGE_NUMBER]
+
+FLAGS:
+    -h, --help           Prints help information
+";
 
 mod dh;
 mod set1;
@@ -12,17 +18,23 @@ mod set7;
 mod stream;
 mod utils;
 
-#[derive(Parser)]
-struct Args {
-    /// Challenge number
-    #[arg(short, long)]
-    challenge: u64,
+fn parse_args() -> Result<u64, pico_args::Error> {
+    let mut pargs = pico_args::Arguments::from_env();
+
+    if pargs.contains(["-h", "--help"]) {
+        print!("{}", HELP);
+        std::process::exit(0);
+    }
+
+    let challenge = pargs.value_from_str("-c")?;
+
+    Ok(challenge)
 }
 
 fn main() -> Result<()> {
-    let args = Args::parse();
+    let challenge = parse_args()?;
 
-    match args.challenge {
+    match challenge {
         c @ 1..=8 => set1::run(c),
         c @ 9..=16 => set2::run(c),
         c @ 17..=24 => set3::run(c),
