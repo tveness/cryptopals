@@ -44,7 +44,7 @@ use std::collections::HashSet;
 
 use hex;
 use indicatif::ProgressBar;
-use rand::{thread_rng, Rng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 
 use crate::{set4::challenge30::md4_hash, utils::*};
 
@@ -1019,8 +1019,11 @@ fn g(x: u32, y: u32, z: u32) -> u32 {
     (x & y) | (x & z) | (y & z)
 }
 
-fn generate_md4_candidate_pair() -> (Vec<u8>, Vec<u8>) {
-    let mut rng = thread_rng();
+fn generate_md4_candidate_pair(seed: Option<u64>) -> (Vec<u8>, Vec<u8>) {
+    let mut rng = match seed {
+        None => StdRng::from_entropy(),
+        Some(x) => StdRng::seed_from_u64(x),
+    };
 
     let mut message: Vec<u8> = (0..64).map(|_| rng.gen::<u8>()).collect();
     //println!("Pre-massage: {}", bytes_to_hex(&message));
@@ -1126,7 +1129,7 @@ pub fn main() -> Result<()> {
         spinner.tick();
         tries += 1;
 
-        let (message, message_p) = generate_md4_candidate_pair();
+        let (message, message_p) = generate_md4_candidate_pair(None);
         let hash = md4_hash(&message);
         let hash_p = md4_hash(&message_p);
 
@@ -1167,9 +1170,26 @@ mod tests {
         assert_eq!(x, 0x04);
     }
 
-    #[ignore = "slow"]
     #[test]
     fn md4_collision() {
-        main().unwrap();
+        let mut tries = 1;
+        let spinner = ProgressBar::new_spinner();
+        spinner.set_message(format!("Tries: {}", tries));
+        while tries < 1_000_000_000 {
+            spinner.set_message(format!("Tries: {}", tries));
+            spinner.tick();
+            // Seed that doesn't take very long
+            let (message, message_p) = generate_md4_candidate_pair(Some(150000 + tries));
+            let hash = md4_hash(&message);
+            let hash_p = md4_hash(&message_p);
+
+            if hash == hash_p && message != message_p {
+                println!("m1: {}", bytes_to_hex(&message));
+                println!("m2: {}", bytes_to_hex(&message_p));
+                println!("hash: {}", hash);
+                break;
+            }
+            tries += 1;
+        }
     }
 }
