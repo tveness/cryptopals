@@ -1191,6 +1191,7 @@ mod tests {
             }
             tries += 1;
         }
+        spinner.finish();
         if tries == 1_000_000_000 {
             panic!("Didn't find a collision");
         }

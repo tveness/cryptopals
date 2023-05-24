@@ -56,29 +56,61 @@
 
 use crate::utils::*;
 use base64::{engine::general_purpose, Engine as _};
+use indicatif::ProgressBar;
+use itertools::Itertools;
 use rand::Rng;
 use rand::{rngs::ThreadRng, thread_rng};
 use rc4::Rc4;
 use rc4::{KeyInit, StreamCipher};
 
-fn encrypt(cookie: &[u8], message: &[u8], rng: &mut ThreadRng) -> Vec<u8> {
+fn encrypt(message: &[u8], rng: &mut ThreadRng) -> Vec<u8> {
     let mut key = [0; 16];
     rng.fill(&mut key[..]);
 
     let mut rc4 = Rc4::new(&key.into());
-    let mut data = cookie.to_vec();
-    data.extend_from_slice(message);
+    let mut data = message.to_vec();
     rc4.apply_keystream(&mut data);
     data.to_vec()
+}
+
+fn decode_pos_32(cookie: &[u8], offset: usize) -> u8 {
+    let spinner = ProgressBar::new_spinner();
+
+    let mut message = vec![0_u8; offset + 2];
+    message.extend_from_slice(cookie);
+    let mut rng = thread_rng();
+
+    let mut byte_count = [0; 256];
+    let mut counter = 1;
+    // 2**24 seems to be sufficient
+    while counter < (1 << 24) {
+        if counter % 100_000 == 0 {
+            spinner.set_message(format!("Offset {}: {}", offset, counter));
+            spinner.tick();
+        }
+        let b = encrypt(&message, &mut rng)[31] as usize;
+        byte_count[b] += 1;
+        counter += 1;
+    }
+    // Bias in position 32 is towards 224
+    let output = byte_count.iter().position_max().unwrap() as u8 ^ 224_u8;
+
+    spinner.set_message(format!("Offset {}: {}", offset, output));
+    spinner.finish();
+    output
 }
 
 pub fn main() -> Result<()> {
     let secret_base_64 = "QkUgU1VSRSBUTyBEUklOSyBZT1VSIE9WQUxUSU5F";
     let cookie = general_purpose::STANDARD.decode(secret_base_64).unwrap();
-    let mut rng = thread_rng();
+    println!("Cookie length: {}", cookie.len());
 
-    let d = encrypt(&cookie, b"test", &mut rng);
-    println!("d: {:?}", d);
+    // Length of cookie is 30, so we can always target byte 31 (position 32)
+    let data: Vec<u8> = (0..30).map(|i| decode_pos_32(&cookie, i)).rev().collect();
+
+    println!("d: {:?}", data);
+    println!("Decoded data: {}", std::str::from_utf8(&data).unwrap());
+    assert_eq!(cookie, data);
 
     Ok(())
 }
