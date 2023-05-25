@@ -92,8 +92,151 @@
 //!    reassemble Bob's secret key using the Chinese Remainder Theorem.
 //!
 
+use std::str::FromStr;
+
 use crate::utils::*;
+use hmac_sha256::HMAC;
+use num_bigint::{BigInt, RandBigInt};
+use num_integer::Integer;
+use num_traits::{FromPrimitive, Zero};
+use rand::rngs::ThreadRng;
+use rand::thread_rng;
+
+/*
+fn primes_below(limit: &BigInt) -> Vec<BigInt> {
+    let mut count: BigInt = 2.into();
+    let mut primes: Vec<BigInt> = vec![count.clone()];
+    while &count < limit {
+        match primes.iter().any(|p| &count % p == BigInt::zero()) {
+            true => {}
+            false => primes.push(count.clone()),
+        }
+        count += 1;
+    }
+
+    primes
+}
+*/
+
+fn get_factors(n: &BigInt, limit: &BigInt) -> Vec<BigInt> {
+    let mut factors = vec![];
+    //let primes = primes_below(limit);
+    let mut n = n.clone();
+    let mut p: BigInt = 2.into();
+    while &p < limit {
+        // Check if factor
+        if n.is_multiple_of(&p) {
+            factors.push(p.clone());
+        }
+        // Divide out all instances of this factor
+        while n.is_multiple_of(&p) {
+            n /= &p;
+        }
+        p += 1;
+    }
+
+    factors
+}
 
 pub fn main() -> Result<()> {
-    unimplemented!()
+    let mut rng = thread_rng();
+    let p = BigInt::from_str("7199773997391911030609999317773941274322764333428698921736339643928346453700085358802973900485592910475480089726140708102474957429903531369589969318716771")?;
+    let g = BigInt::from_str("4565356397095740655436854503483826832136106141639563487732438195343690437606117828318042418238184896212352329118608100083187535033402010599512641674644143")?;
+    let q = BigInt::from_str("236234353446506858198510045061214171961")?;
+
+    let a_priv = rng.gen_bigint_range(&BigInt::zero(), &q);
+    let b_priv = rng.gen_bigint_range(&BigInt::zero(), &q);
+
+    let a_pub = g.modpow(&a_priv, &p);
+    let b_pub = g.modpow(&b_priv, &p);
+
+    let shared = a_pub.modpow(&b_priv, &p);
+    let sharedp = b_pub.modpow(&a_priv, &p);
+    println!("Shared:  {}", shared);
+    println!("Shared': {}", sharedp);
+    assert_eq!(shared, sharedp);
+
+    println!("g^q mod p = {}", g.modpow(&q, &p));
+    let j: BigInt = (&p - &BigInt::from_u16(1).unwrap()) / &q;
+    println!("j: {}", j);
+
+    let two: BigInt = 2.into();
+    let limit = two.pow(16);
+    let j_fac = get_factors(&j, &limit);
+    let mut rng = thread_rng();
+    println!("j factors: {:?}", j_fac);
+
+    let mut total_prod: BigInt = 1.into();
+    let mut rx = vec![];
+    for r in j_fac {
+        // h = rand(1, p)^((p-1)/r) mod p
+        let h = get_h(&p, &r, &mut rng);
+        //println!("h: {}", h);
+
+        // Bob computes "shared key"
+        // K := h^x mod p
+        let k = h.modpow(&b_priv, &p);
+        // m := "crazy flamboyant for the rap enjoyment"
+        // t := MAC(K, m)
+        let m = "crazy flamboyant for the rap enjoyment";
+        let t = HMAC::mac(m, k.to_bytes_be().1);
+        //println!("t: {:?}", t);
+        // Only r possible values of K Bob could have
+        // So find it!
+        let mut x_crack: BigInt = 1.into();
+        loop {
+            let k_crack = h.modpow(&x_crack, &p);
+            if HMAC::mac(m, k_crack.to_bytes_be().1) == t {
+                break;
+            } else {
+                x_crack += 1;
+            }
+        }
+        println!("x mod {}: {}", r, x_crack);
+
+        rx.push((r.clone(), x_crack));
+
+        total_prod *= &r;
+        if total_prod > q {
+            break;
+        }
+    }
+
+    // Now crack using CRT
+    assert!(total_prod > q);
+
+    let mut result: BigInt = BigInt::zero();
+    for (r, x) in rx {
+        let ms = &total_prod / &r;
+        result += x * &ms * invmod(&ms, &r);
+    }
+    result %= &total_prod;
+
+    println!("Cracked x: {}", result);
+    println!("B secret : {}", b_priv);
+
+    assert_eq!(result, b_priv);
+
+    Ok(())
+}
+
+fn get_h(p: &BigInt, r: &BigInt, rng: &mut ThreadRng) -> BigInt {
+    let one: BigInt = 1.into();
+    let pow = (p - &one) / r;
+    loop {
+        let h = rng.gen_bigint_range(&one, p).modpow(&pow, p);
+        if h != one {
+            return h;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn subgroup_confinement() {
+        main().unwrap();
+    }
 }
