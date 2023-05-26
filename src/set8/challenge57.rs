@@ -118,7 +118,7 @@ fn primes_below(limit: &BigInt) -> Vec<BigInt> {
 }
 */
 
-fn get_factors(n: &BigInt, limit: &BigInt) -> Vec<BigInt> {
+pub fn get_factors(n: &BigInt, limit: &BigInt) -> Vec<BigInt> {
     let mut factors = vec![];
     //let primes = primes_below(limit);
     let mut n = n.clone();
@@ -220,7 +220,7 @@ pub fn main() -> Result<()> {
     Ok(())
 }
 
-fn get_h(p: &BigInt, r: &BigInt, rng: &mut ThreadRng) -> BigInt {
+pub fn get_h(p: &BigInt, r: &BigInt, rng: &mut ThreadRng) -> BigInt {
     let one: BigInt = 1.into();
     let pow = (p - &one) / r;
     loop {

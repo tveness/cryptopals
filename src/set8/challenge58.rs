@@ -161,13 +161,18 @@
 //! down the remaining bits.
 
 use anyhow::anyhow;
+use hmac_sha256::HMAC;
 use indicatif::ProgressBar;
-use num_bigint::BigInt;
+use num_bigint::{BigInt, RandBigInt};
 use num_integer::Integer;
-use num_traits::{FromPrimitive, Zero};
+use num_traits::{FromPrimitive, ToPrimitive, Zero};
+use rand::thread_rng;
 use std::str::FromStr;
 
-use crate::utils::*;
+use crate::{
+    set8::challenge57::{get_factors, get_h},
+    utils::*,
+};
 
 fn try_kangaroo<F>(
     f: F,
@@ -253,10 +258,71 @@ where
 }
 
 pub fn main() -> Result<()> {
-    let _p = BigInt::from_str("11470374874925275658116663507232161402086650258453896274534991676898999262641581519101074740642369848233294239851519212341844337347119899874391456329785623").unwrap();
-    let _q = BigInt::from_str("335062023296420808191071248367701059461").unwrap();
-    let _j = BigInt::from_str("34233586850807404623475048381328686211071196701374230492615844865929237417097514638999377942356150481334217896204702").unwrap();
-    let _g = BigInt::from_str("622952335333961296978159266084741085889881358738459939978290179936063635566740258555167783009058567397963466103140082647486611657350811560630587013183357").unwrap();
+    let p = BigInt::from_str("11470374874925275658116663507232161402086650258453896274534991676898999262641581519101074740642369848233294239851519212341844337347119899874391456329785623").unwrap();
+    let q = BigInt::from_str("335062023296420808191071248367701059461").unwrap();
+    let j = BigInt::from_str("34233586850807404623475048381328686211071196701374230492615844865929237417097514638999377942356150481334217896204702").unwrap();
+    let g = BigInt::from_str("622952335333961296978159266084741085889881358738459939978290179936063635566740258555167783009058567397963466103140082647486611657350811560630587013183357").unwrap();
+
+    // Generate a keypair for Bob
+    let mut rng = thread_rng();
+    let b_priv = rng.gen_bigint_range(&BigInt::zero(), &q);
+    let b_pub = g.modpow(&b_priv, &p);
+
+    let two: BigInt = 2.into();
+    let limit = two.pow(26);
+    let j_fac = get_factors(&j, &limit);
+    println!("j factors: {:?}", j_fac);
+    // Pick the largest r to have the smallest range to go through
+    let r = j_fac.last().unwrap().to_owned();
+
+    let h = get_h(&p, &r, &mut rng);
+    let k = h.modpow(&b_priv, &p);
+    let m = "crazy flamboyant for the rap enjoyment";
+    let t = HMAC::mac(m, k.to_bytes_be().1);
+
+    let mut x_crack: BigInt = 1.into();
+    loop {
+        let k_crack = h.modpow(&x_crack, &p);
+        if HMAC::mac(m, k_crack.to_bytes_be().1) == t {
+            break;
+        } else {
+            x_crack += 1;
+        }
+    }
+    println!("We now know x mod r = {}", x_crack);
+    println!("Time to figure out the rest");
+
+    // y = g**(x) = g**(n+mr), where n is x_crack
+    let gn = g.modpow(&x_crack, &p);
+    let gninv = invmod(&gn, &p);
+    let yp: BigInt = (&b_pub * &gninv) % &p;
+    let gp: BigInt = g.modpow(&r, &p);
+
+    let one = BigInt::from_u32(1).unwrap();
+    let upper_index: BigInt = (&q - &one) / &r;
+
+    let k = BigInt::from_u32(25).unwrap();
+    let stretch = BigInt::from_u32(4).unwrap();
+    let n = stretch * (two.modpow(&(&one + &k), &p) / &k);
+
+    let index = try_kangaroo(
+        |z| {
+            let zmod = z.mod_floor(&k).to_u32().unwrap();
+            two.pow(zmod)
+        },
+        &n,
+        &gp,
+        &p,
+        &BigInt::zero(),
+        &upper_index,
+        &yp,
+    )
+    .unwrap();
+    let deduced = g.modpow(&index, &p);
+    let b_priv_deduced: BigInt = &x_crack + &index * &r;
+    println!("b_priv_dedu = {}", b_priv_deduced);
+    println!("b_priv_true = {}", b_priv);
+    assert_eq!(b_priv_deduced, b_priv);
 
     Ok(())
 }
@@ -264,7 +330,6 @@ pub fn main() -> Result<()> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use num_traits::ToPrimitive;
 
     #[test]
     fn small_kangaroo() {
