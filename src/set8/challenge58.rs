@@ -163,12 +163,11 @@
 use anyhow::anyhow;
 use indicatif::ProgressBar;
 use num_bigint::BigInt;
-use num_traits::Zero;
+use num_integer::Integer;
+use num_traits::{FromPrimitive, Zero};
+use std::str::FromStr;
 
 use crate::utils::*;
-use num_integer::Integer;
-use num_traits::{FromPrimitive, ToPrimitive};
-use std::str::FromStr;
 
 fn try_kangaroo<F>(
     f: F,
@@ -202,7 +201,7 @@ where
             //println!("f: {}", ff);
         }
     }
-    spinner.set_message(format!("Tame kangaroo set trap"));
+    spinner.set_message("Tame kangaroo set trap".to_string());
     spinner.finish();
 
     // Wild kangaroo
@@ -223,7 +222,7 @@ where
         xw += &ff;
         yw = (yw * g.modpow(&ff, p)) % p;
         if yw == yt {
-            spinner.set_message(format!("Caught the wild kangaroo!"));
+            spinner.set_message("Caught the wild kangaroo!".to_string());
             spinner.finish();
             return Ok(b + xt - xw);
         }
@@ -233,94 +232,116 @@ where
     Err(anyhow!("Wild kangaroo never landed on the tame kangaroo"))
 }
 
-fn kangaroo<F>(
-    f: F,
-    n: &BigInt,
-    g: &BigInt,
-    p: &BigInt,
-    a: &BigInt,
-    b: &BigInt,
-    y: &BigInt,
-) -> BigInt
+#[allow(dead_code)]
+fn kangaroo<F>(f: F, g: &BigInt, p: &BigInt, a: &BigInt, b: &BigInt, y: &BigInt) -> BigInt
 where
     F: Copy + FnOnce(&BigInt) -> BigInt,
 {
+    let mut k = BigInt::from_u32(11).unwrap();
+    let one = BigInt::from_u32(1).unwrap();
+    let two = BigInt::from_u32(2).unwrap();
+    let mut n = two.modpow(&(&one + &k), p) / &k;
+    let stretch = BigInt::from_u32(8).unwrap();
     loop {
         println!("Loop");
-        if let Ok(z) = try_kangaroo(f, n, g, p, a, b, y) {
+        if let Ok(z) = try_kangaroo(f, &n, g, p, a, b, y) {
             return z;
         }
+        k += 1;
+        n = &stretch * two.modpow(&(&one + &k), p) / &k;
     }
 }
 
 pub fn main() -> Result<()> {
-    // We will choose f(y) = 2**(y mod k)
-    //
-
-    // Parameters from text
-
-    let p = BigInt::from_str("11470374874925275658116663507232161402086650258453896274534991676898999262641581519101074740642369848233294239851519212341844337347119899874391456329785623").unwrap();
-    let q = BigInt::from_str("335062023296420808191071248367701059461").unwrap();
-    let j = BigInt::from_str("34233586850807404623475048381328686211071196701374230492615844865929237417097514638999377942356150481334217896204702").unwrap();
-    let g = BigInt::from_str("622952335333961296978159266084741085889881358738459939978290179936063635566740258555167783009058567397963466103140082647486611657350811560630587013183357").unwrap();
-
-    let five = BigInt::from_u32(5).unwrap();
-    let two = BigInt::from_u32(2).unwrap();
-    let one = BigInt::from_u32(1).unwrap();
-    let three = BigInt::from_u32(3).unwrap();
-
-    let k = BigInt::from_u32(11).unwrap();
-    let upper_index = BigInt::from_u32(20).unwrap();
-    let n = two.modpow(&(&five + &k), &p) / &k;
-    let y = BigInt::from_str("7760073848032689505395005705677365876654629189298052775754597607446617558600394076764814236081991643094239886772481052254010323780165093955236429914607119").unwrap();
-    println!("Finding index in range [0,2^20]");
-    let index = try_kangaroo(
-        |z| {
-            let zmod = z.mod_floor(&k).to_u32().unwrap();
-            //        println!("z: {}", z);
-            //        println!("zmod: {}", zmod);
-
-            two.pow(zmod)
-        },
-        &n,
-        &g,
-        &p,
-        &BigInt::zero(),
-        &upper_index,
-        &y,
-    )
-    .unwrap();
-
-    let deduced = g.modpow(&index, &p);
-    println!("index: {} vs 2^20: {}", index, two.pow(20));
-    println!("g**index mod p = {}", deduced);
-    println!("y = {}", y);
-    assert_eq!(deduced, y);
-
-    let y = BigInt::from_str("9388897478013399550694114614498790691034187453089355259602614074132918843899833277397448144245883225611726912025846772975325932794909655215329941809013733").unwrap();
-    let upper_index = BigInt::from_u32(40).unwrap();
-    let stretch = BigInt::from_u32(8).unwrap();
-
-    let k = BigInt::from_u32(22).unwrap();
-    let n = stretch * (two.modpow(&(&one + &k), &p) / &k);
-
-    let index = try_kangaroo(
-        |z| {
-            let zmod = z.mod_floor(&k).to_u32().unwrap();
-            two.pow(zmod)
-        },
-        &n,
-        &g,
-        &p,
-        &BigInt::zero(),
-        &upper_index,
-        &y,
-    )
-    .unwrap();
-    let deduced = g.modpow(&index, &p);
-    println!("g**index mod p = {}", deduced);
-    println!("y = {}", y);
-    assert_eq!(deduced, y);
+    let _p = BigInt::from_str("11470374874925275658116663507232161402086650258453896274534991676898999262641581519101074740642369848233294239851519212341844337347119899874391456329785623").unwrap();
+    let _q = BigInt::from_str("335062023296420808191071248367701059461").unwrap();
+    let _j = BigInt::from_str("34233586850807404623475048381328686211071196701374230492615844865929237417097514638999377942356150481334217896204702").unwrap();
+    let _g = BigInt::from_str("622952335333961296978159266084741085889881358738459939978290179936063635566740258555167783009058567397963466103140082647486611657350811560630587013183357").unwrap();
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use num_traits::ToPrimitive;
+
+    #[test]
+    fn small_kangaroo() {
+        let p = BigInt::from_str("11470374874925275658116663507232161402086650258453896274534991676898999262641581519101074740642369848233294239851519212341844337347119899874391456329785623").unwrap();
+        let _q = BigInt::from_str("335062023296420808191071248367701059461").unwrap();
+        let _j = BigInt::from_str("34233586850807404623475048381328686211071196701374230492615844865929237417097514638999377942356150481334217896204702").unwrap();
+        let g = BigInt::from_str("622952335333961296978159266084741085889881358738459939978290179936063635566740258555167783009058567397963466103140082647486611657350811560630587013183357").unwrap();
+
+        let five = BigInt::from_u32(5).unwrap();
+        let two = BigInt::from_u32(2).unwrap();
+        let _one = BigInt::from_u32(1).unwrap();
+        let _three = BigInt::from_u32(3).unwrap();
+
+        let k = BigInt::from_u32(11).unwrap();
+        let upper_index = BigInt::from_u32(20).unwrap();
+        let n = two.modpow(&(&five + &k), &p) / &k;
+        let y = BigInt::from_str("7760073848032689505395005705677365876654629189298052775754597607446617558600394076764814236081991643094239886772481052254010323780165093955236429914607119").unwrap();
+        println!("Finding index in range [0,2^20]");
+        let index = try_kangaroo(
+            |z| {
+                let zmod = z.mod_floor(&k).to_u32().unwrap();
+                //        println!("z: {}", z);
+                //        println!("zmod: {}", zmod);
+
+                two.pow(zmod)
+            },
+            &n,
+            &g,
+            &p,
+            &BigInt::zero(),
+            &upper_index,
+            &y,
+        )
+        .unwrap();
+
+        let deduced = g.modpow(&index, &p);
+        println!("index: {} vs 2^20: {}", index, two.pow(20));
+        println!("g**index mod p = {}", deduced);
+        println!("y = {}", y);
+        assert_eq!(deduced, y);
+    }
+
+    #[ignore = "slow"]
+    #[test]
+    fn big_kangaroo() {
+        let p = BigInt::from_str("11470374874925275658116663507232161402086650258453896274534991676898999262641581519101074740642369848233294239851519212341844337347119899874391456329785623").unwrap();
+        let _q = BigInt::from_str("335062023296420808191071248367701059461").unwrap();
+        let _j = BigInt::from_str("34233586850807404623475048381328686211071196701374230492615844865929237417097514638999377942356150481334217896204702").unwrap();
+        let g = BigInt::from_str("622952335333961296978159266084741085889881358738459939978290179936063635566740258555167783009058567397963466103140082647486611657350811560630587013183357").unwrap();
+
+        let _five = BigInt::from_u32(5).unwrap();
+        let two = BigInt::from_u32(2).unwrap();
+        let one = BigInt::from_u32(1).unwrap();
+
+        let y = BigInt::from_str("9388897478013399550694114614498790691034187453089355259602614074132918843899833277397448144245883225611726912025846772975325932794909655215329941809013733").unwrap();
+        let upper_index = BigInt::from_u32(40).unwrap();
+        let stretch = BigInt::from_u32(8).unwrap();
+
+        let k = BigInt::from_u32(22).unwrap();
+        let n = stretch * (two.modpow(&(&one + &k), &p) / &k);
+
+        let index = try_kangaroo(
+            |z| {
+                let zmod = z.mod_floor(&k).to_u32().unwrap();
+                two.pow(zmod)
+            },
+            &n,
+            &g,
+            &p,
+            &BigInt::zero(),
+            &upper_index,
+            &y,
+        )
+        .unwrap();
+        let deduced = g.modpow(&index, &p);
+        println!("g**index mod p = {}", deduced);
+        println!("y = {}", y);
+        assert_eq!(deduced, y);
+    }
 }
