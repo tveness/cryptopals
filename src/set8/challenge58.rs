@@ -269,27 +269,62 @@ pub fn main() -> Result<()> {
     let b_pub = g.modpow(&b_priv, &p);
 
     let two: BigInt = 2.into();
-    let limit = two.pow(26);
+    let limit = two.pow(20);
     let j_fac = get_factors(&j, &limit);
     println!("j factors: {:?}", j_fac);
-    // Pick the largest r to have the smallest range to go through
-    let r = j_fac.last().unwrap().to_owned();
 
-    let h = get_h(&p, &r, &mut rng);
-    let k = h.modpow(&b_priv, &p);
-    let m = "crazy flamboyant for the rap enjoyment";
-    let t = HMAC::mac(m, k.to_bytes_be().1);
+    let mut total_prod: BigInt = 1.into();
+    let mut rx = vec![];
 
-    let mut x_crack: BigInt = 1.into();
-    loop {
-        let k_crack = h.modpow(&x_crack, &p);
-        if HMAC::mac(m, k_crack.to_bytes_be().1) == t {
+    for r in j_fac {
+        // h = rand(1, p)^((p-1)/r) mod p
+        let h = get_h(&p, &r, &mut rng);
+        //println!("h: {}", h);
+
+        // Bob computes "shared key"
+        // K := h^x mod p
+        let k = h.modpow(&b_priv, &p);
+        // m := "crazy flamboyant for the rap enjoyment"
+        // t := MAC(K, m)
+        let m = "crazy flamboyant for the rap enjoyment";
+        let t = HMAC::mac(m, k.to_bytes_be().1);
+        //println!("t: {:?}", t);
+        // Only r possible values of K Bob could have
+        // So find it!
+        let mut x_crack: BigInt = 1.into();
+        loop {
+            let k_crack = h.modpow(&x_crack, &p);
+            if HMAC::mac(m, k_crack.to_bytes_be().1) == t {
+                break;
+            } else {
+                x_crack += 1;
+            }
+        }
+        println!("x mod {}: {}", r, x_crack);
+
+        rx.push((r.clone(), x_crack));
+
+        total_prod *= &r;
+        if total_prod > q {
             break;
-        } else {
-            x_crack += 1;
         }
     }
+
+    // Incomplete CRT
+    let mut result: BigInt = BigInt::zero();
+    for (r, x) in rx {
+        let ms = &total_prod / &r;
+        result += x * &ms * invmod(&ms, &r);
+    }
+    result %= &total_prod;
+
+    let r = total_prod.clone();
+    let x_crack = result;
+
+    let one = BigInt::from_u32(1).unwrap();
     println!("We now know x mod r = {}", x_crack);
+    println!("r: {}", r);
+    println!("Upper bound: {}", (&q - &one) / &r);
     println!("Time to figure out the rest");
 
     // y = g**(x) = g**(n+mr), where n is x_crack
@@ -298,10 +333,9 @@ pub fn main() -> Result<()> {
     let yp: BigInt = (&b_pub * &gninv) % &p;
     let gp: BigInt = g.modpow(&r, &p);
 
-    let one = BigInt::from_u32(1).unwrap();
     let upper_index: BigInt = (&q - &one) / &r;
 
-    let k = BigInt::from_u32(25).unwrap();
+    let k = BigInt::from_u32(22).unwrap();
     let stretch = BigInt::from_u32(4).unwrap();
     let n = stretch * (two.modpow(&(&one + &k), &p) / &k);
 
