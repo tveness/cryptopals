@@ -269,9 +269,9 @@ pub fn main() -> Result<()> {
     let one = BigInt::from_u32(1).unwrap();
     let three = BigInt::from_u32(3).unwrap();
 
-    let k = BigInt::from_u32(12).unwrap();
+    let k = BigInt::from_u32(11).unwrap();
     let upper_index = BigInt::from_u32(20).unwrap();
-    let n = (two.modpow(&(&three + &k), &p) / &k);
+    let n = two.modpow(&(&five + &k), &p) / &k;
     let y = BigInt::from_str("7760073848032689505395005705677365876654629189298052775754597607446617558600394076764814236081991643094239886772481052254010323780165093955236429914607119").unwrap();
     println!("Finding index in range [0,2^20]");
     let index = try_kangaroo(
@@ -292,15 +292,18 @@ pub fn main() -> Result<()> {
     .unwrap();
 
     let deduced = g.modpow(&index, &p);
+    println!("index: {} vs 2^20: {}", index, two.pow(20));
     println!("g**index mod p = {}", deduced);
     println!("y = {}", y);
     assert_eq!(deduced, y);
 
-    let k = BigInt::from_u32(20).unwrap();
-    let n = (two.modpow(&(&five + &k), &p) / &k);
-
     let y = BigInt::from_str("9388897478013399550694114614498790691034187453089355259602614074132918843899833277397448144245883225611726912025846772975325932794909655215329941809013733").unwrap();
     let upper_index = BigInt::from_u32(40).unwrap();
+    let stretch = BigInt::from_u32(8).unwrap();
+
+    let k = BigInt::from_u32(22).unwrap();
+    let n = stretch * (two.modpow(&(&one + &k), &p) / &k);
+
     let index = try_kangaroo(
         |z| {
             let zmod = z.mod_floor(&k).to_u32().unwrap();
@@ -314,6 +317,10 @@ pub fn main() -> Result<()> {
         &y,
     )
     .unwrap();
+    let deduced = g.modpow(&index, &p);
+    println!("g**index mod p = {}", deduced);
+    println!("y = {}", y);
+    assert_eq!(deduced, y);
 
     Ok(())
 }
