@@ -300,6 +300,7 @@ pub fn main() -> Result<()> {
                 x_crack += 1;
             }
         }
+        x_crack %= &r;
         println!("x mod {}: {}", r, x_crack);
 
         rx.push((r.clone(), x_crack));
@@ -335,7 +336,7 @@ pub fn main() -> Result<()> {
 
     let upper_index: BigInt = (&q - &one) / &r;
 
-    let k = BigInt::from_u32(22).unwrap();
+    let k = BigInt::from_u32(23).unwrap();
     let stretch = BigInt::from_u32(4).unwrap();
     let n = stretch * (two.modpow(&(&one + &k), &p) / &k);
 
@@ -352,7 +353,6 @@ pub fn main() -> Result<()> {
         &yp,
     )
     .unwrap();
-    let deduced = g.modpow(&index, &p);
     let b_priv_deduced: BigInt = &x_crack + &index * &r;
     println!("b_priv_dedu = {}", b_priv_deduced);
     println!("b_priv_true = {}", b_priv);

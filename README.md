@@ -98,7 +98,7 @@ A place to work through the CryptoPals challenges in Rust to hopefully learn thi
 
 - [ ] Set 8, Abstract algebra
   - ✅ 57. Diffie-Hellman Revisited: Small Subgroup Confinement [src](src/set8/challenge57.rs)
-  - [ ] 58. Pollard's Method for Catching Kangaroos [src](src/set8/challenge58.rs)
+  - ✅ 58. Pollard's Method for Catching Kangaroos [src](src/set8/challenge58.rs)
   - [ ] 59. Elliptic Curve Diffie-Hellman and Invalid-Curve Attacks [src](src/set8/challenge59.rs)
   - [ ] 60. Single-Coordinate Ladders and Insecure Twists [src](src/set8/challenge60.rs)
   - [ ] 61. Duplicate-Signature Key Selection in ECDSA (and RSA) [src](src/set8/challenge61.rs)
