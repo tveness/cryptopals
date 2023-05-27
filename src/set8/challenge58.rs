@@ -167,12 +167,76 @@ use num_bigint::{BigInt, RandBigInt};
 use num_integer::Integer;
 use num_traits::{FromPrimitive, ToPrimitive, Zero};
 use rand::thread_rng;
+use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::{
     set8::challenge57::{get_factors, get_h},
     utils::*,
 };
+
+#[allow(dead_code)]
+pub fn shanks(g: &BigInt, p: &BigInt, upper: &BigInt, y: &BigInt) -> Result<BigInt> {
+    // Trying to solve g^x = y
+    // x is in a range say, [0,2^n]
+    // So we can break the problem down into two steps, the giant and the baby step, each of order
+    // sqrt(n).
+    // x = i + m*j, m = sqrt(n)
+    // This means that i runs from 1-> floor(sqrt(n)), j from 1-> floor(sqrt(n))
+    //
+    // Pre-compute all of y* g^(-mj) -> sqrt(n) operations, and store in a hash table:
+    // y*g^(-mj) : j
+    //
+    // Now calculate g^i for all i, and find the collision with the hash table
+    // We now have j and i, so can calculate the index
+
+    let mut h = HashMap::new();
+    let m: BigInt = upper.sqrt();
+    let thou = BigInt::from_u32(1000).unwrap();
+
+    let mut i = BigInt::zero();
+
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_message(format!("Baby step {}: {}", i, m));
+    // Big step hashmap
+    while i <= m {
+        let gi = g.modpow(&i, p);
+        h.insert(gi, i.clone());
+        if i.is_multiple_of(&thou) {
+            spinner.set_message(format!("Baby step {}: {}", i, m));
+            spinner.tick();
+        }
+        i += 1;
+    }
+    spinner.set_message("Baby step completed".to_string());
+    spinner.finish();
+
+    let mut j = BigInt::zero();
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_message(format!("Giant step {}: {}", i, m));
+    while j <= m {
+        if j.is_multiple_of(&thou) {
+            spinner.set_message(format!("Giant step {}: {}", j, m));
+            spinner.tick();
+        }
+
+        let gmj = g.modpow(&(&m * &j), p);
+        let gmjinv = invmod(&gmj, p);
+        let yp = (y * gmjinv) % p;
+
+        if let Some(i_true) = h.get(&yp) {
+            let index: BigInt = i_true + &j * m;
+            spinner.set_message("Giant step completed".to_string());
+            spinner.finish();
+            return Ok(index);
+        }
+        j += 1;
+    }
+    spinner.set_message("Giant step completed, no solution found".to_string());
+    spinner.finish();
+
+    Err(anyhow!("Index not in bound"))
+}
 
 fn try_kangaroo<F>(
     f: F,
@@ -365,6 +429,44 @@ pub fn main() -> Result<()> {
 mod test {
     use super::*;
 
+    #[test]
+    fn small_shanks() {
+        let p = BigInt::from_str("11470374874925275658116663507232161402086650258453896274534991676898999262641581519101074740642369848233294239851519212341844337347119899874391456329785623").unwrap();
+        let _q = BigInt::from_str("335062023296420808191071248367701059461").unwrap();
+        let _j = BigInt::from_str("34233586850807404623475048381328686211071196701374230492615844865929237417097514638999377942356150481334217896204702").unwrap();
+        let g = BigInt::from_str("622952335333961296978159266084741085889881358738459939978290179936063635566740258555167783009058567397963466103140082647486611657350811560630587013183357").unwrap();
+        let y = BigInt::from_str("7760073848032689505395005705677365876654629189298052775754597607446617558600394076764814236081991643094239886772481052254010323780165093955236429914607119").unwrap();
+        let two = BigInt::from_u32(2).unwrap();
+        let upper_bound: BigInt = two.pow(20);
+
+        let index = shanks(&g, &p, &upper_bound, &y).unwrap();
+
+        let deduced = g.modpow(&index, &p);
+        println!("index: {} vs 2^20: {}", index, upper_bound);
+        println!("g**index mod p = {}", deduced);
+        println!("y = {}", y);
+        assert_eq!(deduced, y);
+    }
+
+    #[ignore = "slow"]
+    #[test]
+    fn big_shanks() {
+        let p = BigInt::from_str("11470374874925275658116663507232161402086650258453896274534991676898999262641581519101074740642369848233294239851519212341844337347119899874391456329785623").unwrap();
+        let _q = BigInt::from_str("335062023296420808191071248367701059461").unwrap();
+        let _j = BigInt::from_str("34233586850807404623475048381328686211071196701374230492615844865929237417097514638999377942356150481334217896204702").unwrap();
+        let g = BigInt::from_str("622952335333961296978159266084741085889881358738459939978290179936063635566740258555167783009058567397963466103140082647486611657350811560630587013183357").unwrap();
+        let y = BigInt::from_str("9388897478013399550694114614498790691034187453089355259602614074132918843899833277397448144245883225611726912025846772975325932794909655215329941809013733").unwrap();
+        let two = BigInt::from_u32(2).unwrap();
+        let upper_bound: BigInt = two.pow(40);
+
+        let index = shanks(&g, &p, &upper_bound, &y).unwrap();
+
+        let deduced = g.modpow(&index, &p);
+        println!("index: {} vs 2^20: {}", index, upper_bound);
+        println!("g**index mod p = {}", deduced);
+        println!("y = {}", y);
+        assert_eq!(deduced, y);
+    }
     #[test]
     fn small_kangaroo() {
         let p = BigInt::from_str("11470374874925275658116663507232161402086650258453896274534991676898999262641581519101074740642369848233294239851519212341844337347119899874391456329785623").unwrap();
