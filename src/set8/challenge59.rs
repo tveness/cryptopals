@@ -273,7 +273,58 @@
 //! Implement the key-recovery attack from #57 using small-order points
 //! from invalid curves.
 
+use std::ops::Add;
+
+use num_bigint::BigInt;
+
 use crate::utils::*;
+
+#[derive(Debug, Clone, PartialEq)]
+enum Point {
+    P { x: BigInt, y: BigInt },
+    O,
+}
+
+impl Point {
+    fn invert(&self) -> Self {
+        self.clone()
+    }
+}
+
+impl Add for Point {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        if self == Point::O {
+            return other;
+        }
+        if other == Point::O {
+            return self;
+        }
+        if self == other.invert() {
+            return Point::O;
+        }
+
+        if let (Self::P { x: x1, y: y1 }, Self::P { x: x2, y: y2 }) = (self, other) {
+            let a = x1.clone();
+            let m = match (&x1, &y1) == (&x2, &y2) {
+                true => {
+                    let three: BigInt = 3.into();
+                    let two: BigInt = 2.into();
+                    (three * &x1 * &x1 + &a) / (two * &y1)
+                }
+                false => (&y2 - &y1) / (&x2 - &x1),
+            };
+
+            let x: BigInt = &m * &m - &x1 - &x2;
+            let y: BigInt = &m * (&x1 - &x) - &y1;
+
+            return Self::P { x, y };
+        } else {
+            panic!("Unexpected");
+        }
+    }
+}
 
 pub fn main() -> Result<()> {
     unimplemented!()
