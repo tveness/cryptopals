@@ -273,11 +273,20 @@
 //! Implement the key-recovery attack from #57 using small-order points
 //! from invalid curves.
 
-use std::ops::Add;
-
 use num_bigint::BigInt;
+use num_integer::Integer;
+use num_traits::{FromPrimitive, Zero};
+use std::str::FromStr;
 
 use crate::utils::*;
+
+#[derive(Debug)]
+struct CurveParams {
+    a: BigInt,
+    b: BigInt,
+    p: BigInt,
+    bp: Point,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 enum Point {
@@ -286,46 +295,91 @@ enum Point {
 }
 
 impl Point {
-    fn invert(&self) -> Self {
-        self.clone()
+    fn invert(&self, p: &BigInt) -> Self {
+        if let Self::P { x, y } = self {
+            Self::P {
+                x: x.clone(),
+                y: p - y.clone(),
+            }
+        } else {
+            Self::O
+        }
     }
 }
 
-impl Add for Point {
-    type Output = Self;
+struct Curve {
+    params: CurveParams,
+}
 
-    fn add(self, other: Self) -> Self {
-        if self == Point::O {
-            return other;
+impl Curve {
+    fn add(&self, p1: &Point, p2: &Point) -> Point {
+        if p1 == &Point::O {
+            return p2.clone();
         }
-        if other == Point::O {
-            return self;
+        if p2 == &Point::O {
+            return p1.clone();
         }
-        if self == other.invert() {
+        if p1 == &p2.invert(&self.params.p) {
             return Point::O;
         }
 
-        if let (Self::P { x: x1, y: y1 }, Self::P { x: x2, y: y2 }) = (self, other) {
-            let a = x1.clone();
+        if let (Point::P { x: x1, y: y1 }, Point::P { x: x2, y: y2 }) = (p1, p2) {
+            let a: &BigInt = &self.params.a;
             let m = match (&x1, &y1) == (&x2, &y2) {
                 true => {
                     let three: BigInt = 3.into();
                     let two: BigInt = 2.into();
-                    (three * &x1 * &x1 + &a) / (two * &y1)
+                    (three * x1 * x1 + a) / (two * y1)
                 }
-                false => (&y2 - &y1) / (&x2 - &x1),
+                false => (y2 - y1) / (x2 - x1),
             };
 
-            let x: BigInt = &m * &m - &x1 - &x2;
-            let y: BigInt = &m * (&x1 - &x) - &y1;
+            let x: BigInt = &m * &m - x1 - x2;
+            let y: BigInt = &m * (x1 - &x) - y1;
 
-            return Self::P { x, y };
+            return Point::P { x, y };
         } else {
             panic!("Unexpected");
         }
     }
+
+    fn scale(&self, point: &Point, exp: &BigInt) -> Point {
+        let mut result: Point = Point::O;
+        let mut k = exp.clone();
+        let mut x = point.clone();
+        let two = BigInt::from_u32(2).unwrap();
+
+        while k > BigInt::zero() {
+            if k.is_odd() {
+                result = self.add(&x, &result);
+            }
+            x = self.add(&x, &x);
+            k = k.div_floor(&two);
+        }
+        result
+    }
 }
 
 pub fn main() -> Result<()> {
-    unimplemented!()
+    let curve = Curve {
+        params: CurveParams {
+            a: BigInt::from_str("-95051").unwrap(),
+            b: BigInt::from_str("11279326").unwrap(),
+            p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+            bp: Point::P {
+                x: BigInt::from_str("182").unwrap(),
+                y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
+            },
+        },
+    };
+
+    println!("P: {:?}", curve.params.bp);
+    let twop = curve.add(&curve.params.bp, &curve.params.bp);
+    println!("2P: {:?}", twop);
+
+    println!(
+        "2P: {:?}",
+        curve.scale(&curve.params.bp, &BigInt::from_u32(2).unwrap())
+    );
+    Ok(())
 }
