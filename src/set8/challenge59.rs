@@ -276,7 +276,7 @@
 use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::{FromPrimitive, Zero};
-use std::str::FromStr;
+use std::{ops::Shr, str::FromStr};
 
 use crate::utils::*;
 
@@ -325,37 +325,54 @@ impl Curve {
 
         if let (Point::P { x: x1, y: y1 }, Point::P { x: x2, y: y2 }) = (p1, p2) {
             let a: &BigInt = &self.params.a;
-            let m = match (&x1, &y1) == (&x2, &y2) {
+            let m: BigInt = match (x1, y1) == (x2, y2) {
                 true => {
                     let three: BigInt = 3.into();
                     let two: BigInt = 2.into();
-                    (three * x1 * x1 + a) / (two * y1)
+                    (three * x1 * x1 + a) * invmod(&(two * y1), &self.params.p)
                 }
-                false => (y2 - y1) / (x2 - x1),
-            };
+                false => (y2 - y1) * invmod(&(x2 - x1), &self.params.p),
+            }
+            .mod_floor(&self.params.p);
 
-            let x: BigInt = &m * &m - x1 - x2;
-            let y: BigInt = &m * (x1 - &x) - y1;
+            let x3: BigInt = (&m * &m - x1 - x2).mod_floor(&self.params.p);
+            let y3: BigInt = (&m * (x1 - &x3) - y1).mod_floor(&self.params.p);
 
-            return Point::P { x, y };
+            return Point::P { x: x3, y: y3 };
         } else {
             panic!("Unexpected");
         }
     }
 
+    //     function scale(x, k):
+    //         result := identity
+    //         while k > 0:
+    //             if odd(k):
+    //                 result := combine(result, x)
+    //             x := combine(x, x)
+    //             k := k >> 1
+    //         return result
     fn scale(&self, point: &Point, exp: &BigInt) -> Point {
         let mut result: Point = Point::O;
         let mut k = exp.clone();
         let mut x = point.clone();
-        let two = BigInt::from_u32(2).unwrap();
+        let mut ri = 0;
+        let mut xi = 1;
+        println!("exp: {}", exp);
+        //println!("X: {}", ri);
 
         while k > BigInt::zero() {
             if k.is_odd() {
-                result = self.add(&x, &result);
+                result = self.add(&result, &x);
+                ri = ri + xi;
+                println!("Adding {x:?} <=> Adding: {xi}");
             }
             x = self.add(&x, &x);
-            k = k.div_floor(&two);
+            xi *= 2;
+            // k = k.div_floor(&two);
+            k = k.shr(1);
         }
+        //assert_eq!(&BigInt::from_usize(ri).unwrap(), exp);
         result
     }
 }
@@ -381,5 +398,49 @@ pub fn main() -> Result<()> {
         "2P: {:?}",
         curve.scale(&curve.params.bp, &BigInt::from_u32(2).unwrap())
     );
+    //let threep = curve.add(&twop, &curve.params.bp);
+    let threep = curve.add(&curve.params.bp, &twop);
+    println!("3P: {:?}", threep);
+    println!(
+        "3P: {:?}",
+        curve.scale(&curve.params.bp, &BigInt::from_u32(3).unwrap())
+    );
+
+    // Test the order!
+    let ord = BigInt::from_str("29246302889428143187362802287225875743").unwrap();
+    let p_ord = curve.scale(&curve.params.bp, &ord);
+    println!("P_ord: {:?}", p_ord);
+
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn scale_test() {
+        let curve = Curve {
+            params: CurveParams {
+                a: BigInt::from_str("-95051").unwrap(),
+                b: BigInt::from_str("11279326").unwrap(),
+                p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+                bp: Point::P {
+                    x: BigInt::from_str("182").unwrap(),
+                    y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
+                },
+            },
+        };
+        let mut running = curve.params.bp.clone();
+        println!("Base point: {:?}", running);
+        for i in 1..10_000 {
+            running = curve.add(&curve.params.bp, &running);
+            let scaled = curve.scale(&curve.params.bp, &BigInt::from_usize(i + 1).unwrap());
+            println!("{}*P", i + 1);
+            println!("Running: {:?}", running);
+            println!("Scaled: {:?}", scaled);
+            assert_eq!(running, scaled);
+        }
+    }
 }
