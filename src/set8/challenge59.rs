@@ -432,14 +432,14 @@ mod tests {
                 },
             },
         };
-        let mut running = curve.params.bp.clone();
+        let mut running = Point::O;
         println!("Base point: {:?}", running);
-        for i in 1..10_000 {
+        for i in 0..10_000 {
             running = curve.add(&curve.params.bp, &running);
             let scaled = curve.scale(&curve.params.bp, &BigInt::from_usize(i + 1).unwrap());
             println!("{}*P", i + 1);
             println!("Running: {:?}", running);
-            println!("Scaled: {:?}", scaled);
+            println!("Scaled:  {:?}", scaled);
             assert_eq!(running, scaled);
         }
     }
