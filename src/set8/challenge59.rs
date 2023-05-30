@@ -273,6 +273,7 @@
 //! Implement the key-recovery attack from #57 using small-order points
 //! from invalid curves.
 
+use anyhow::anyhow;
 use num_bigint::{BigInt, RandBigInt};
 use num_integer::Integer;
 use num_traits::{FromPrimitive, Zero};
@@ -286,6 +287,7 @@ struct CurveParams {
     a: BigInt,
     b: BigInt,
     p: BigInt,
+    ord: BigInt,
     bp: Point,
 }
 
@@ -420,19 +422,18 @@ pub fn main() -> Result<()> {
                 x: BigInt::from_str("182").unwrap(),
                 y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
             },
+            ord: BigInt::from_str("29246302889428143187362802287225875743").unwrap(),
         },
     };
-
-    let ord = BigInt::from_str("29246302889428143187362802287225875743").unwrap();
 
     let mut rng = thread_rng();
 
     // Generate A's private key
-    let a_priv = rng.gen_bigint_range(&BigInt::zero(), &ord);
+    let a_priv = rng.gen_bigint_range(&BigInt::zero(), &curve.params.ord);
     let a_pub = curve.gen(&a_priv);
 
     // Generate B's private key
-    let b_priv = rng.gen_bigint_range(&BigInt::zero(), &ord);
+    let b_priv = rng.gen_bigint_range(&BigInt::zero(), &curve.params.ord);
     let b_pub = curve.gen(&b_priv);
 
     let b_shared = curve.scale(&a_pub, &b_priv);
@@ -440,8 +441,150 @@ pub fn main() -> Result<()> {
     assert_eq!(a_shared, b_shared);
 
     println!("B public key: {:?}", b_pub);
+    // y^2 = x^3 - 95051*x + 210
+    // 233970423115425145550826547352470124412
+    let curve1 = Curve {
+        params: CurveParams {
+            a: BigInt::from_str("-95051").unwrap(),
+            b: BigInt::from_str("210").unwrap(),
+            p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+            bp: Point::P {
+                x: BigInt::from_str("182").unwrap(),
+                y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
+            },
+            ord: BigInt::from_str("233970423115425145550826547352470124412").unwrap(),
+        },
+    };
+
+    // y^2 = x^3 - 95051*x + 504
+    // 233970423115425145544350131142039591210
+    let curve2 = Curve {
+        params: CurveParams {
+            a: BigInt::from_str("-95051").unwrap(),
+            b: BigInt::from_str("504").unwrap(),
+            p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+            bp: Point::P {
+                x: BigInt::from_str("182").unwrap(),
+                y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
+            },
+            ord: BigInt::from_str("233970423115425145544350131142039591210").unwrap(),
+        },
+    };
+
+    // y^2 = x^3 - 95051*x + 727
+    // 233970423115425145545378039958152057148
+    let curve3 = Curve {
+        params: CurveParams {
+            a: BigInt::from_str("-95051").unwrap(),
+            b: BigInt::from_str("727").unwrap(),
+            p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+            bp: Point::P {
+                x: BigInt::from_str("182").unwrap(),
+                y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
+            },
+            ord: BigInt::from_str("233970423115425145545378039958152057148").unwrap(),
+        },
+    };
 
     Ok(())
+}
+
+/// Tonelli-Shanks modular sqrt
+fn ts_sqrt(curve: &Curve, point: &Point) -> Result<Point> {
+    if !is_sq(curve, point) {
+        return Err(anyhow!("No sqrt exists for point"));
+    }
+    // First factor p-1
+    let mut s = BigInt::zero();
+    let one = BigInt::from_usize(1).unwrap();
+    let two = BigInt::from_usize(2).unwrap();
+    let mut q: BigInt = &curve.params.p - BigInt::from_usize(1).unwrap();
+    while q.is_multiple_of(&two) {
+        q = q.div_floor(&two);
+        s += &one;
+    }
+
+    // p-1 = q * 2^s
+
+    // Now find a z which is quadratic non-residue
+    let z = quad_non_res(&curve);
+
+    // Set vars
+    let mut m = s.clone();
+    let mut c = curve.scale(&z, &q);
+    let mut t = curve.scale(&point, &q);
+    let qp = (&q + &one).div_floor(&two);
+    let mut r = curve.scale(&point, &qp);
+
+    loop {
+        match t {
+            Point::O => return Ok(Point::O),
+            _ if t == curve.params.bp => return Ok(r),
+            _ => {}
+        }
+        let mut i = BigInt::zero();
+        let mut ti = BigInt::from_usize(2).unwrap();
+        while curve.scale(&t, &ti) != curve.params.bp {
+            ti = &ti * &ti;
+            i = &i + &one;
+        }
+
+        let b = curve.scale(&c, &two.exp(&(m - &i - &one)));
+        m = i;
+        c = curve.scale(&b, &two);
+        t = curve.add(&t, &c);
+        r = curve.add(&r, &b);
+    }
+}
+
+trait Exp {
+    fn exp(&self, other: &BigInt) -> Self;
+}
+
+impl Exp for BigInt {
+    fn exp(&self, other: &BigInt) -> Self {
+        let mut count = other.clone();
+        let mut result = BigInt::from_usize(1).unwrap();
+        let mut x = self.clone();
+        let two = BigInt::from_usize(2).unwrap();
+        while count != BigInt::zero() {
+            if count.is_odd() {
+                result *= &x;
+            }
+            x = &x * &x;
+            count = count.div_floor(&two);
+        }
+        result
+    }
+}
+
+fn is_sq(curve: &Curve, point: &Point) -> bool {
+    // Euler criterion:
+    // a**( (p-1)/2) = 1 mod p if there exists x st a = x^2
+    //                -1 mod p if not
+    //
+    // Why does this make sense?
+    // If a = x^2
+    // a**( (p-1)/2 ) = x**(p-1) = 1
+    //
+    // For the EC, this means
+    // ( (p-1)/2 ) P = O
+
+    let one = BigInt::from_usize(1).unwrap();
+    let power: BigInt = (&curve.params.p - &one).div_floor(&BigInt::from_usize(2).unwrap());
+    curve.scale(&point, &power) == Point::O
+}
+
+fn quad_non_res(curve: &Curve) -> Point {
+    let mut rng = thread_rng();
+    loop {
+        let zi = rng.gen_bigint_range(&BigInt::zero(), &curve.params.p);
+        let z = curve.gen(&zi);
+
+        if !is_sq(curve, &z) {
+            return z;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -460,6 +603,7 @@ mod tests {
                     x: BigInt::from_str("182").unwrap(),
                     y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
                 },
+                ord: BigInt::from_str("29246302889428143187362802287225875743").unwrap(),
             },
         };
         let mut running = Point::O;
@@ -485,6 +629,7 @@ mod tests {
                     x: BigInt::from_str("182").unwrap(),
                     y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
                 },
+                ord: BigInt::from_str("29246302889428143187362802287225875743").unwrap(),
             },
         };
         let p1 = Point::P {
@@ -513,12 +658,13 @@ mod tests {
                     x: BigInt::from_str("182").unwrap(),
                     y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
                 },
+                ord: BigInt::from_str("29246302889428143187362802287225875743").unwrap(),
             },
         };
 
         // Test the order!
         let ord = BigInt::from_str("29246302889428143187362802287225875743").unwrap();
-        let p_ord = curve.scale(&curve.params.bp, &ord);
+        let p_ord = curve.scale(&curve.params.bp, &curve.params.ord);
         println!("P_ord: {:?}", p_ord);
         assert_eq!(p_ord, Point::O);
     }
@@ -534,6 +680,7 @@ mod tests {
                     x: BigInt::from_str("182").unwrap(),
                     y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
                 },
+                ord: BigInt::from_str("29246302889428143187362802287225875743").unwrap(),
             },
         };
 
@@ -552,5 +699,43 @@ mod tests {
         let b_shared = curve.scale(&a_pub, &b_priv);
         let a_shared = curve.scale(&b_pub, &a_priv);
         assert_eq!(a_shared, b_shared);
+    }
+
+    #[test]
+    fn bigint_pow() {
+        let two = BigInt::from_usize(2).unwrap();
+        let fifteen = BigInt::from_usize(15).unwrap();
+        let ans = BigInt::from_usize(2_usize.pow(15)).unwrap();
+        assert_eq!(two.exp(&fifteen), ans);
+
+        let three = BigInt::from_usize(3).unwrap();
+        let fifteen = BigInt::from_usize(15).unwrap();
+        let ans = BigInt::from_usize(3_usize.pow(15)).unwrap();
+        assert_eq!(three.exp(&fifteen), ans);
+    }
+
+    #[test]
+    fn sqrt_test() {
+        let curve = Curve {
+            params: CurveParams {
+                a: BigInt::from_str("-95051").unwrap(),
+                b: BigInt::from_str("11279326").unwrap(),
+                p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+                bp: Point::P {
+                    x: BigInt::from_str("182").unwrap(),
+                    y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
+                },
+                ord: BigInt::from_str("29246302889428143187362802287225875743").unwrap(),
+            },
+        };
+
+        for i in 1..100 {
+            let pt = curve.gen(&BigInt::from_usize(2 * i).unwrap());
+            let s = curve.gen(&BigInt::from_usize(i).unwrap());
+
+            let s_d = ts_sqrt(&curve, &pt).unwrap();
+
+            assert_eq!(s_d, s);
+        }
     }
 }
