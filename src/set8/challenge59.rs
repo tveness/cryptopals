@@ -312,6 +312,40 @@ struct Curve {
 }
 
 impl Curve {
+    /// Adds two points on an elliptic curve
+    ///
+    /// y^2 = x^3 + ax + b
+    ///
+    /// P+Q=S
+    /// R=-S
+    ///
+    /// For distinct points
+    /// Straight line going through P, Q is given by
+    /// y = y_p + m * (x-x_p)
+    /// m = (y_q-y_p)/(x_q-x_p)
+    ///
+    /// Plug this into EC, and find third root
+    ///
+    /// (y_p + m(x-x_p))^2 = x^3 + ax + b
+    ///
+    /// x^3 + ax + b - y_p^2 - m^2 (x-x_p)^2 - 2m(x-x_p)y_p = 0
+    /// Has form
+    /// (x-x_p)(x-x_q)(x-x_s) = 0
+    /// and so x^2 component is of form -x^2(x_p+x_q+x_s)
+    /// i.e.
+    /// x_p + x_q + x_s = m^2
+    /// i.e. x_s = m^2 - x_p - x_q
+    /// y_s follow from straight line
+    /// y_s = y_p + m(x_s-x_p)
+    /// and R follows by reflection in x-axis i.e. x_r = x_s, y_r = -y_s
+    ///
+    /// x_r = m^2 - x_p - x_q
+    /// y_r = m(x_p - x_r) - y_p
+    ///
+    /// For doubling a point, m is simply the gradient
+    /// 2 y y' = 3x^2 + a
+    /// => m = (3 x_p^2 + a)/(2 y_p)
+    /// And the rest follows in the same way
     fn add(&self, p1: &Point, p2: &Point) -> Point {
         if p1 == &Point::O {
             return p2.clone();
