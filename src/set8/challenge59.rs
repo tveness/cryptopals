@@ -273,9 +273,10 @@
 //! Implement the key-recovery attack from #57 using small-order points
 //! from invalid curves.
 
-use num_bigint::BigInt;
+use num_bigint::{BigInt, RandBigInt};
 use num_integer::Integer;
 use num_traits::{FromPrimitive, Zero};
+use rand::thread_rng;
 use std::{ops::Shr, str::FromStr};
 
 use crate::utils::*;
@@ -381,6 +382,10 @@ impl Curve {
         }
     }
 
+    fn gen(&self, n: &BigInt) -> Point {
+        self.scale(&self.params.bp, n)
+    }
+
     //     function scale(x, k):
     //         result := identity
     //         while k > 0:
@@ -418,39 +423,23 @@ pub fn main() -> Result<()> {
         },
     };
 
-    println!("P: {:?}", curve.params.bp);
-    let twop = curve.add(&curve.params.bp, &curve.params.bp);
-    println!("2P: {:?}", twop);
-
-    println!(
-        "2P: {:?}",
-        curve.scale(&curve.params.bp, &BigInt::from_u32(2).unwrap())
-    );
-    //let threep = curve.add(&twop, &curve.params.bp);
-    let threep = curve.add(&curve.params.bp, &twop);
-    println!("3P: {:?}", threep);
-    println!(
-        "3P: {:?}",
-        curve.scale(&curve.params.bp, &BigInt::from_u32(3).unwrap())
-    );
-
-    // Add two
-    let p1 = Point::P {
-        x: BigInt::from_str("231110995916992900219346197897292237295").unwrap(),
-        y: BigInt::from_str("63844552430235414594643301238328922535").unwrap(),
-    };
-    let p2 = Point::P {
-        x: BigInt::from_str("98092099574465157328748843078997945208").unwrap(),
-        y: BigInt::from_str("160574384385092871957843305589437197340").unwrap(),
-    };
-
-    let p6 = curve.add(&p2, &p1);
-    println!("6P: {:?}", p6);
-
-    // Test the order!
     let ord = BigInt::from_str("29246302889428143187362802287225875743").unwrap();
-    let p_ord = curve.scale(&curve.params.bp, &ord);
-    println!("P_ord: {:?}", p_ord);
+
+    let mut rng = thread_rng();
+
+    // Generate A's private key
+    let a_priv = rng.gen_bigint_range(&BigInt::zero(), &ord);
+    let a_pub = curve.gen(&a_priv);
+
+    // Generate B's private key
+    let b_priv = rng.gen_bigint_range(&BigInt::zero(), &ord);
+    let b_pub = curve.gen(&b_priv);
+
+    let b_shared = curve.scale(&a_pub, &b_priv);
+    let a_shared = curve.scale(&b_pub, &a_priv);
+    assert_eq!(a_shared, b_shared);
+
+    println!("B public key: {:?}", b_pub);
 
     Ok(())
 }
@@ -532,5 +521,36 @@ mod tests {
         let p_ord = curve.scale(&curve.params.bp, &ord);
         println!("P_ord: {:?}", p_ord);
         assert_eq!(p_ord, Point::O);
+    }
+
+    #[test]
+    fn dh_ec() {
+        let curve = Curve {
+            params: CurveParams {
+                a: BigInt::from_str("-95051").unwrap(),
+                b: BigInt::from_str("11279326").unwrap(),
+                p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+                bp: Point::P {
+                    x: BigInt::from_str("182").unwrap(),
+                    y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
+                },
+            },
+        };
+
+        let ord = BigInt::from_str("29246302889428143187362802287225875743").unwrap();
+
+        let mut rng = thread_rng();
+
+        // Generate A's private key
+        let a_priv = rng.gen_bigint_range(&BigInt::zero(), &ord);
+        let a_pub = curve.gen(&a_priv);
+
+        // Generate B's private key
+        let b_priv = rng.gen_bigint_range(&BigInt::zero(), &ord);
+        let b_pub = curve.gen(&b_priv);
+
+        let b_shared = curve.scale(&a_pub, &b_priv);
+        let a_shared = curve.scale(&b_pub, &a_priv);
+        assert_eq!(a_shared, b_shared);
     }
 }
