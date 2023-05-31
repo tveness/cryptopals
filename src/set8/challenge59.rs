@@ -422,7 +422,7 @@ pub fn main() -> Result<()> {
                 x: BigInt::from_str("182").unwrap(),
                 y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
             },
-            ord: BigInt::from_str("29246302889428143187362802287225875743").unwrap(),
+            ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
         },
     };
 
@@ -490,15 +490,17 @@ pub fn main() -> Result<()> {
 }
 
 /// Tonelli-Shanks modular sqrt
-fn ts_sqrt(curve: &Curve, point: &Point) -> Result<Point> {
-    if !is_sq(curve, point) {
+/// Adapted from https://crypto.stanford.edu/pbc/notes/ep/tonelli.html
+fn ts_sqrt(n: &BigInt, modulus: &BigInt) -> Result<BigInt> {
+    if !is_sq(n, modulus) {
         return Err(anyhow!("No sqrt exists for point"));
     }
+
     // First factor p-1
     let mut s = BigInt::zero();
     let one = BigInt::from_usize(1).unwrap();
     let two = BigInt::from_usize(2).unwrap();
-    let mut q: BigInt = &curve.params.p - BigInt::from_usize(1).unwrap();
+    let mut q: BigInt = modulus - BigInt::from_usize(1).unwrap();
     while q.is_multiple_of(&two) {
         q = q.div_floor(&two);
         s += &one;
@@ -507,33 +509,33 @@ fn ts_sqrt(curve: &Curve, point: &Point) -> Result<Point> {
     // p-1 = q * 2^s
 
     // Now find a z which is quadratic non-residue
-    let z = quad_non_res(&curve);
+    let z = quad_non_res(&modulus);
 
     // Set vars
     let mut m = s.clone();
-    let mut c = curve.scale(&z, &q);
-    let mut t = curve.scale(&point, &q);
+    let mut c = z.modpow(&q, modulus);
+    let mut t = n.modpow(&q, modulus);
     let qp = (&q + &one).div_floor(&two);
-    let mut r = curve.scale(&point, &qp);
+    let mut r = n.modpow(&qp, modulus);
 
     loop {
         match t {
-            Point::O => return Ok(Point::O),
-            _ if t == curve.params.bp => return Ok(r),
+            z if t == BigInt::zero() => return Ok(z),
+            _ if t == one => return Ok(r),
             _ => {}
         }
         let mut i = BigInt::zero();
         let mut ti = BigInt::from_usize(2).unwrap();
-        while curve.scale(&t, &ti) != curve.params.bp {
+        while t.exp(&ti) < m {
             ti = &ti * &ti;
             i = &i + &one;
         }
 
-        let b = curve.scale(&c, &two.exp(&(m - &i - &one)));
+        let b = c.exp(&two.exp(&(m - &i - &one)));
         m = i;
-        c = curve.scale(&b, &two);
-        t = curve.add(&t, &c);
-        r = curve.add(&r, &b);
+        c = b.exp(&two);
+        t = &t * &b * &b;
+        r = r * &b;
     }
 }
 
@@ -558,30 +560,23 @@ impl Exp for BigInt {
     }
 }
 
-fn is_sq(curve: &Curve, point: &Point) -> bool {
-    // Euler criterion:
-    // a**( (p-1)/2) = 1 mod p if there exists x st a = x^2
-    //                -1 mod p if not
-    //
-    // Why does this make sense?
-    // If a = x^2
-    // a**( (p-1)/2 ) = x**(p-1) = 1
-    //
-    // For the EC, this means
-    // ( (p-1)/2 ) P = O
-
+fn is_sq(n: &BigInt, modulus: &BigInt) -> bool {
     let one = BigInt::from_usize(1).unwrap();
-    let power: BigInt = (&curve.params.p - &one).div_floor(&BigInt::from_usize(2).unwrap());
-    curve.scale(&point, &power) == Point::O
+    // a^p = a mod p
+    // (ord) P = O
+    // (ord+1) P = P
+    //
+    let power: BigInt = (modulus - &one).div_floor(&BigInt::from_usize(2).unwrap());
+    let d = n.modpow(&power, modulus);
+    d == one
 }
 
-fn quad_non_res(curve: &Curve) -> Point {
+fn quad_non_res(modulus: &BigInt) -> BigInt {
     let mut rng = thread_rng();
     loop {
-        let zi = rng.gen_bigint_range(&BigInt::zero(), &curve.params.p);
-        let z = curve.gen(&zi);
+        let z = rng.gen_bigint_range(&BigInt::zero(), modulus);
 
-        if !is_sq(curve, &z) {
+        if !is_sq(&z, modulus) {
             return z;
         }
     }
@@ -603,7 +598,7 @@ mod tests {
                     x: BigInt::from_str("182").unwrap(),
                     y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
                 },
-                ord: BigInt::from_str("29246302889428143187362802287225875743").unwrap(),
+                ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
             },
         };
         let mut running = Point::O;
@@ -629,7 +624,7 @@ mod tests {
                     x: BigInt::from_str("182").unwrap(),
                     y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
                 },
-                ord: BigInt::from_str("29246302889428143187362802287225875743").unwrap(),
+                ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
             },
         };
         let p1 = Point::P {
@@ -658,7 +653,7 @@ mod tests {
                     x: BigInt::from_str("182").unwrap(),
                     y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
                 },
-                ord: BigInt::from_str("29246302889428143187362802287225875743").unwrap(),
+                ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
             },
         };
 
@@ -680,7 +675,7 @@ mod tests {
                     x: BigInt::from_str("182").unwrap(),
                     y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
                 },
-                ord: BigInt::from_str("29246302889428143187362802287225875743").unwrap(),
+                ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
             },
         };
 
@@ -725,15 +720,18 @@ mod tests {
                     x: BigInt::from_str("182").unwrap(),
                     y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
                 },
-                ord: BigInt::from_str("29246302889428143187362802287225875743").unwrap(),
+                ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
             },
         };
 
+        let two = BigInt::from_usize(2).unwrap();
         for i in 1..100 {
-            let pt = curve.gen(&BigInt::from_usize(2 * i).unwrap());
-            let s = curve.gen(&BigInt::from_usize(i).unwrap());
-
-            let s_d = ts_sqrt(&curve, &pt).unwrap();
+            let pt = BigInt::from_usize(2 * i).unwrap();
+            let s = BigInt::from_usize(i).unwrap();
+            let pt = two.exp(&pt);
+            let s = two.exp(&s);
+            println!("pt: {}", pt);
+            let s_d = ts_sqrt(&pt, &curve.params.p).unwrap();
 
             assert_eq!(s_d, s);
         }
