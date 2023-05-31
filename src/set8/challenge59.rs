@@ -280,7 +280,7 @@ use num_traits::{FromPrimitive, Zero};
 use rand::thread_rng;
 use std::{ops::Shr, str::FromStr};
 
-use crate::utils::*;
+use crate::{set8::challenge57::get_factors, utils::*};
 
 #[derive(Debug)]
 struct CurveParams {
@@ -455,6 +455,17 @@ pub fn main() -> Result<()> {
             ord: BigInt::from_str("233970423115425145550826547352470124412").unwrap(),
         },
     };
+    let two = BigInt::from_usize(2).unwrap();
+    let limit = two.pow(20);
+    let curve1_orders = get_factors(&curve1.params.ord, &limit);
+    let mut rx = vec![];
+    println!("Curve 1 factors: {:?}", curve1_orders);
+
+    // Pick an order for this curve
+
+    rx.extend_from_slice(&get_residues(&curve1, &curve1_orders, &curve, &b_priv));
+
+    println!("Recovered: {:?}", rx);
 
     // y^2 = x^3 - 95051*x + 504
     // 233970423115425145544350131142039591210
@@ -471,6 +482,16 @@ pub fn main() -> Result<()> {
         },
     };
 
+    let curve2_orders = get_factors(&curve2.params.ord, &limit);
+    // Ensure we don't duplicate r, as we already have that information
+    let curve2_orders: Vec<_> = curve2_orders
+        .into_iter()
+        .filter(|r| !rx.iter().any(|(x, _)| r == x))
+        .collect();
+    println!("Curve 2 factors: {:?}", curve2_orders);
+    rx.extend_from_slice(&get_residues(&curve2, &curve2_orders, &curve, &b_priv));
+
+    println!("Recovered: {:?}", rx);
     // y^2 = x^3 - 95051*x + 727
     // 233970423115425145545378039958152057148
     let curve3 = Curve {
@@ -485,8 +506,61 @@ pub fn main() -> Result<()> {
             ord: BigInt::from_str("233970423115425145545378039958152057148").unwrap(),
         },
     };
+    let curve3_orders = get_factors(&curve3.params.ord, &limit);
+    // Ensure we don't duplicate r, as we already have that information
+    let curve3_orders: Vec<_> = curve3_orders
+        .into_iter()
+        .filter(|r| !rx.iter().any(|(x, _)| r == x))
+        .collect();
+    println!("Curve 3 factors: {:?}", curve3_orders);
+    rx.extend_from_slice(&get_residues(&curve3, &curve3_orders, &curve, &b_priv));
+
+    println!("Recovered: {:?}", rx);
+    // CRT
+    // First get total product
+    let total_prod = rx
+        .iter()
+        .fold(BigInt::from_usize(1).unwrap(), |a, (r, _)| a * r);
+
+    let mut result: BigInt = BigInt::zero();
+    for (r, x) in rx {
+        let ms = &total_prod / &r;
+        result += x * &ms * invmod(&ms, &r);
+    }
+    result %= &total_prod;
+
+    println!("Cracked x: {}", result);
+    println!("B secret : {}", b_priv);
+    assert_eq!(result, b_priv);
 
     Ok(())
+}
+fn get_residues(
+    curve: &Curve,
+    orders: &[BigInt],
+    orig_curve: &Curve,
+    b_priv: &BigInt,
+) -> Vec<(BigInt, BigInt)> {
+    let mut recovered = vec![];
+
+    // Skip first factor
+    for r in &orders[1..] {
+        let p1 = get_curve_pt(curve, r);
+        println!("Random point of order {r}: {p1:?}");
+        println!("r P1 = {:?}", curve.scale(&p1, r));
+        // Now send this point to B and see what we get back
+        // (Note that this point still has the same small order in the "real curve" which B uses, as b
+        // does not enter into it
+
+        let b1 = orig_curve.scale(&p1, b_priv);
+        // Reverse b_priv modulo r for this
+        let mut b_r = BigInt::zero();
+        while curve.scale(&p1, &b_r) != b1 {
+            b_r += 1;
+        }
+        recovered.push((r.clone(), b_r));
+    }
+    recovered
 }
 
 /// Tonelli-Shanks modular sqrt
@@ -511,7 +585,7 @@ fn ts_sqrt(n: &BigInt, modulus: &BigInt) -> Result<BigInt> {
     //println!("q*2^s: {}", &q * two.exp(&s));
 
     // Now find a z which is quadratic non-residue
-    let z = quad_non_res(&modulus);
+    let z = quad_non_res(modulus);
 
     // Set vars
     let mut m = s.clone();
@@ -586,6 +660,27 @@ fn quad_non_res(modulus: &BigInt) -> BigInt {
             return z;
         }
     }
+}
+
+fn get_curve_pt(curve: &Curve, r: &BigInt) -> Point {
+    let mut rng = thread_rng();
+
+    loop {
+        let x = rng.gen_bigint_range(&BigInt::zero(), &curve.params.p);
+        if let Ok(y) = get_y(curve, &x) {
+            let p = Point::P { x, y };
+            let sp = curve.scale(&p, &(&curve.params.ord / r));
+            if sp != Point::O {
+                return sp;
+            }
+        }
+    }
+}
+
+fn get_y(curve: &Curve, x: &BigInt) -> Result<BigInt> {
+    //y^2 = x^3 + ax + b
+    let y2 = x * x * x + &curve.params.a * x + &curve.params.b;
+    ts_sqrt(&y2, &curve.params.p)
 }
 
 #[cfg(test)]
