@@ -507,6 +507,8 @@ fn ts_sqrt(n: &BigInt, modulus: &BigInt) -> Result<BigInt> {
     }
 
     // p-1 = q * 2^s
+    //println!("p-1:   {}", modulus - &one);
+    //println!("q*2^s: {}", &q * two.exp(&s));
 
     // Now find a z which is quadratic non-residue
     let z = quad_non_res(&modulus);
@@ -519,23 +521,27 @@ fn ts_sqrt(n: &BigInt, modulus: &BigInt) -> Result<BigInt> {
     let mut r = n.modpow(&qp, modulus);
 
     loop {
+        // println!("In main loop");
         match t {
             z if t == BigInt::zero() => return Ok(z),
             _ if t == one => return Ok(r),
             _ => {}
         }
         let mut i = BigInt::zero();
-        let mut ti = BigInt::from_usize(2).unwrap();
-        while t.exp(&ti) < m {
-            ti = &ti * &ti;
+        while i < m {
+            if t.modpow(&two.exp(&i), modulus) == one {
+                break;
+            }
             i = &i + &one;
+            // println!("i: {}", i);
         }
 
-        let b = c.exp(&two.exp(&(m - &i - &one)));
+        // println!("i: {}", i);
+        let b = c.modpow(&two.exp(&(m - &i - &one)), modulus);
         m = i;
-        c = b.exp(&two);
-        t = &t * &b * &b;
-        r = r * &b;
+        c = (&b * &b) % modulus;
+        t = (&t * &b * &b) % modulus;
+        r = (r * &b) % modulus;
     }
 }
 
@@ -725,15 +731,15 @@ mod tests {
         };
 
         let two = BigInt::from_usize(2).unwrap();
-        for i in 1..100 {
-            let pt = BigInt::from_usize(2 * i).unwrap();
-            let s = BigInt::from_usize(i).unwrap();
-            let pt = two.exp(&pt);
-            let s = two.exp(&s);
+        for i in 1..10_000 {
+            let pt = BigInt::from_usize(i).unwrap();
             println!("pt: {}", pt);
-            let s_d = ts_sqrt(&pt, &curve.params.p).unwrap();
-
-            assert_eq!(s_d, s);
+            if let Ok(s_d) = ts_sqrt(&pt, &curve.params.p) {
+                let recon = (&s_d * &s_d) % &curve.params.p;
+                println!("s_d: {}", s_d);
+                println!("s_d * s_d = {}", recon);
+                assert_eq!(pt, recon);
+            }
         }
     }
 }
