@@ -247,6 +247,8 @@ use num_traits::{FromPrimitive, Zero};
 
 use crate::utils::*;
 
+use super::challenge59::ts_sqrt;
+
 //  B*v^2 = u^3 + A*u^2 + u
 #[allow(non_snake_case, dead_code)]
 struct MontgomeryCurve {
@@ -288,6 +290,12 @@ impl MontgomeryCurve {
 
         (&u2 * w2.modpow(&(&self.p - two), &self.p)) % &self.p
     }
+
+    fn get_v(&self, u: &BigInt) -> Result<BigInt> {
+        let vsq = u * u * u + &self.A * u * u + u;
+
+        ts_sqrt(&vsq, &self.p)
+    }
 }
 
 pub fn main() -> Result<()> {
@@ -300,11 +308,23 @@ pub fn main() -> Result<()> {
     };
     println!("ladder(4,n): {}", curve.ladder(&curve.bp, &curve.ord));
 
+    let u = BigInt::from_str("76600469441198017145391791613091732004").unwrap();
+    let k = BigInt::from_str("11").unwrap();
+    println!(
+        "ladder(76600469441198017145391791613091732004, 11): {}",
+        curve.ladder(&u, &k)
+    );
+
+    // v^2 = u^3 + 534*u^2 + u
+    println!("corresponding v: {:?}", curve.get_v(&u));
+
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::set8::challenge59::{Curve, CurveParams, Point};
+
     use super::*;
 
     #[test]
@@ -317,6 +337,36 @@ mod tests {
             ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
         };
         println!("ladder(4,n): {}", curve.ladder(&curve.bp, &curve.ord));
-        assert_eq!(curve.ladder(&curve.bp, &ord), BigInt::zero());
+        assert_eq!(curve.ladder(&curve.bp, &curve.ord), BigInt::zero());
+    }
+
+    #[test]
+    fn montgomery_ec_test() {
+        let ec = Curve {
+            params: CurveParams {
+                a: BigInt::from_str("-95051").unwrap(),
+                b: BigInt::from_str("11279326").unwrap(),
+                p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+                bp: Point::P {
+                    x: BigInt::from_str("182").unwrap(),
+                    y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
+                },
+                ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
+            },
+        };
+
+        let mc = MontgomeryCurve {
+            A: BigInt::from_str("534").unwrap(),
+            B: BigInt::from_str("1").unwrap(),
+            p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+            bp: BigInt::from_str("4").unwrap(),
+            ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
+        };
+
+        for n in 1..100 {
+            let p = ec.gen(&n.into()).get_x();
+            let q = mc.ladder(&mc.bp, &n.into());
+            assert_eq!(p, Some(q + BigInt::from_usize(178).unwrap()));
+        }
     }
 }
