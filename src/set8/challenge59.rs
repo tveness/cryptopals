@@ -283,21 +283,29 @@ use std::{ops::Shr, str::FromStr};
 use crate::{set8::challenge57::get_factors, utils::*};
 
 #[derive(Debug)]
-struct CurveParams {
-    a: BigInt,
-    b: BigInt,
-    p: BigInt,
-    ord: BigInt,
-    bp: Point,
+pub struct CurveParams {
+    pub a: BigInt,
+    pub b: BigInt,
+    pub p: BigInt,
+    pub ord: BigInt,
+    pub bp: Point,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-enum Point {
+pub enum Point {
     P { x: BigInt, y: BigInt },
     O,
 }
 
 impl Point {
+    #[allow(dead_code)]
+    pub fn get_x(&self) -> Option<BigInt> {
+        match self {
+            Point::P { x, .. } => Some(x.clone()),
+            Point::O => None,
+        }
+    }
+
     fn invert(&self, p: &BigInt) -> Self {
         if let Self::P { x, y } = self {
             Self::P {
@@ -310,8 +318,8 @@ impl Point {
     }
 }
 
-struct Curve {
-    params: CurveParams,
+pub struct Curve {
+    pub params: CurveParams,
 }
 
 impl Curve {
@@ -384,7 +392,7 @@ impl Curve {
         }
     }
 
-    fn gen(&self, n: &BigInt) -> Point {
+    pub fn gen(&self, n: &BigInt) -> Point {
         self.scale(&self.params.bp, n)
     }
 
@@ -396,7 +404,7 @@ impl Curve {
     //             x := combine(x, x)
     //             k := k >> 1
     //         return result
-    fn scale(&self, point: &Point, exp: &BigInt) -> Point {
+    pub fn scale(&self, point: &Point, exp: &BigInt) -> Point {
         let mut result: Point = Point::O;
         let mut k = exp.clone();
         let mut x = point.clone();
@@ -565,7 +573,7 @@ fn get_residues(
 
 /// Tonelli-Shanks modular sqrt
 /// Adapted from https://crypto.stanford.edu/pbc/notes/ep/tonelli.html
-fn ts_sqrt(n: &BigInt, modulus: &BigInt) -> Result<BigInt> {
+pub fn ts_sqrt(n: &BigInt, modulus: &BigInt) -> Result<BigInt> {
     if !is_sq(n, modulus) {
         return Err(anyhow!("No sqrt exists for point"));
     }
@@ -759,7 +767,6 @@ mod tests {
         };
 
         // Test the order!
-        let ord = BigInt::from_str("29246302889428143187362802287225875743").unwrap();
         let p_ord = curve.scale(&curve.params.bp, &curve.params.ord);
         println!("P_ord: {:?}", p_ord);
         assert_eq!(p_ord, Point::O);
@@ -825,7 +832,6 @@ mod tests {
             },
         };
 
-        let two = BigInt::from_usize(2).unwrap();
         for i in 1..10_000 {
             let pt = BigInt::from_usize(i).unwrap();
             println!("pt: {}", pt);
