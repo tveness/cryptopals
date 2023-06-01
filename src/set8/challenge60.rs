@@ -237,8 +237,86 @@
 //! combinatorial explosion of potential CRT outputs. Try sending extra
 //! queries to narrow the range of possibilities.
 
+use std::{
+    ops::{BitAnd, Shr},
+    str::FromStr,
+};
+
+use num_bigint::BigInt;
+use num_traits::{FromPrimitive, Zero};
+
 use crate::utils::*;
 
+//  B*v^2 = u^3 + A*u^2 + u
+#[allow(non_snake_case, dead_code)]
+struct MontgomeryCurve {
+    A: BigInt,
+    B: BigInt,
+    p: BigInt,
+    bp: BigInt,
+    ord: BigInt,
+}
+
+impl MontgomeryCurve {
+    fn ladder(&self, u: &BigInt, k: &BigInt) -> BigInt {
+        let one = BigInt::from_usize(1).unwrap();
+        let two = BigInt::from_usize(2).unwrap();
+        let (mut u2, mut w2) = (one.clone(), BigInt::zero());
+        let (mut u3, mut w3) = (u.clone(), one.clone());
+        for i in (0..self.p.bits()).rev() {
+            //            println!("i: {i}");
+            let b = one.clone().bitand(k.shr(i));
+            if b == one {
+                std::mem::swap(&mut u2, &mut u3);
+                std::mem::swap(&mut w2, &mut w3);
+            }
+            (u3, w3) = (
+                (&u2 * &u3 - &w2 * &w3) * (&u2 * &u3 - &w2 * &w3) % &self.p,
+                u * (&u2 * &w3 - &w2 * &u3) * (&u2 * &w3 - &w2 * &u3) % &self.p,
+            );
+
+            (u2, w2) = (
+                (&u2 * &u2 - &w2 * &w2) * (&u2 * &u2 - &w2 * &w2) % &self.p,
+                4 * &u2 * &w2 * (&u2 * &u2 + &self.A * &u2 * &w2 + &w2 * &w2) % &self.p,
+            );
+
+            if b == one {
+                std::mem::swap(&mut u2, &mut u3);
+                std::mem::swap(&mut w2, &mut w3);
+            }
+        }
+
+        (&u2 * w2.modpow(&(&self.p - two), &self.p)) % &self.p
+    }
+}
+
 pub fn main() -> Result<()> {
-    unimplemented!()
+    let curve = MontgomeryCurve {
+        A: BigInt::from_str("534").unwrap(),
+        B: BigInt::from_str("1").unwrap(),
+        p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+        bp: BigInt::from_str("4").unwrap(),
+        ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
+    };
+    println!("ladder(4,n): {}", curve.ladder(&curve.bp, &curve.ord));
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn montgomery_order_test() {
+        let curve = MontgomeryCurve {
+            A: BigInt::from_str("534").unwrap(),
+            B: BigInt::from_str("1").unwrap(),
+            p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+            bp: BigInt::from_str("4").unwrap(),
+            ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
+        };
+        println!("ladder(4,n): {}", curve.ladder(&curve.bp, &curve.ord));
+        assert_eq!(curve.ladder(&curve.bp, &ord), BigInt::zero());
+    }
 }
