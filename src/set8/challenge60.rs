@@ -242,10 +242,11 @@ use std::{
     str::FromStr,
 };
 
-use num_bigint::BigInt;
+use num_bigint::{BigInt, RandBigInt};
 use num_traits::{FromPrimitive, Zero};
+use rand::thread_rng;
 
-use crate::utils::*;
+use crate::{set8::challenge57::get_factors, utils::*};
 
 use super::challenge59::ts_sqrt;
 
@@ -318,7 +319,92 @@ pub fn main() -> Result<()> {
     // v^2 = u^3 + 534*u^2 + u
     println!("corresponding v: {:?}", curve.get_v(&u));
 
+    let twist_ord: BigInt = 2 * &curve.p + BigInt::from_usize(2).unwrap() - &curve.ord;
+
+    println!("Order: {}", curve.ord);
+    println!("Twist order: {}", twist_ord);
+    let limit = BigInt::from_usize(2).unwrap().pow(20);
+    let twist_factors = get_factors(&twist_ord, &limit);
+
+    println!("Twist order factors: {:?}", twist_factors);
+    let mut rng = thread_rng();
+    let b_priv = rng.gen_bigint_range(&BigInt::zero(), &curve.ord);
+    let b_pub = curve.ladder(&curve.bp, &b_priv);
+
+    let mut rx: Vec<(BigInt, BigInt)> = vec![];
+    for r in &twist_factors[1..] {
+        println!("r: {}", r);
+        let p = gen_twist_point(&curve, &r, &twist_ord);
+        println!("ladder(p,r): {}", curve.ladder(&p, &r));
+        // Send point to Bob
+        let b_shared = curve.ladder(&p, &b_priv);
+        // Now crack this
+        rx.push((r.clone(), get_residue(&curve, &p, &b_shared, &r)));
+    }
+    println!("Residues: {:?}", rx);
+
+    let crt_result = crt(&rx);
+    println!("Crt result: {:?}", crt_result);
+    let x = crt_result.0;
+    let m = crt_result.1;
+
+    // index = x mod m
+
+    // Now do a Kangaroo on this
+    //
+    // index = x + n m
+    // b_pub = ladder(base, index)
+    // Which we can think of in the same way as p
+    // y = ladder(ladder(base, x), n m)
+
     Ok(())
+}
+
+fn get_residue(curve: &MontgomeryCurve, pt: &BigInt, b_shared: &BigInt, r: &BigInt) -> BigInt {
+    let mut index = BigInt::zero();
+    while &curve.ladder(&pt, &index) != b_shared {
+        index += 1;
+        if &index > r {
+            panic!("index bigger than r");
+        }
+    }
+    index
+}
+
+fn gen_twist_point(curve: &MontgomeryCurve, r: &BigInt, twist_order: &BigInt) -> BigInt {
+    let mut rng = thread_rng();
+    let nr: BigInt = twist_order / r;
+    println!("nr: {nr}");
+
+    loop {
+        let u = rng.gen_bigint_range(&BigInt::zero(), &curve.p);
+
+        match curve.get_v(&u) {
+            Ok(_) => {}
+            Err(_) => {
+                //println!("Found a u: {u}");
+                let p = curve.ladder(&u, &nr);
+                //println!("Found a p: {p}");
+                if p != BigInt::zero() {
+                    return p;
+                }
+            }
+        }
+    }
+}
+
+/// Takes vector of (modulus, residue) and returns result of CRT
+fn crt(rx: &[(BigInt, BigInt)]) -> (BigInt, BigInt) {
+    let total_prod = rx
+        .iter()
+        .fold(BigInt::from_usize(1).unwrap(), |a, (r, _)| a * r);
+
+    let mut result: BigInt = BigInt::zero();
+    for (r, x) in rx {
+        let ms = &total_prod / r;
+        result += x * &ms * invmod(&ms, r);
+    }
+    (result % &total_prod, total_prod)
 }
 
 #[cfg(test)]
