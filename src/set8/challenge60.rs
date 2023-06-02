@@ -243,6 +243,7 @@ use std::{
 };
 
 use num_bigint::{BigInt, RandBigInt};
+use num_integer::Integer;
 use num_traits::{FromPrimitive, Zero};
 use rand::thread_rng;
 
@@ -292,8 +293,35 @@ impl MontgomeryCurve {
         (&u2 * w2.modpow(&(&self.p - two), &self.p)) % &self.p
     }
 
+    fn add(&self, u1: &BigInt, u2: &BigInt) -> Result<BigInt> {
+        //     B*v^2 = u^3 + A*u^2 + u
+        let v1 = self.get_v(&u1)?.mod_floor(&self.p);
+        let v2 = self.get_v(&u2)?.mod_floor(&self.p);
+        println!("v1: {}", v1);
+        println!("v2: {}", v2);
+
+        let u3 = match u1 == u2 {
+            // Distinct points
+            false => {
+                println!("Distinct");
+                let num: BigInt = &v2 - &v1;
+                let den: BigInt = u2 - u1;
+                &self.B * &num * &num * invmod(&(&den * &den), &self.p) - &self.A - u1 - u2
+            }
+            // Doubling point
+            true => {
+                println!("Double");
+                let one = BigInt::from_usize(1).unwrap();
+                let num: BigInt = 3 * u1 * u1 + 2 * &self.A * u1 + &one;
+                let den: BigInt = 2 * &self.B * &v1;
+                &self.B * &num * &num * invmod(&(&den * &den), &self.p) - &self.A - u1 - u1
+            }
+        };
+        Ok(u3.mod_floor(&self.p))
+    }
+
     fn get_v(&self, u: &BigInt) -> Result<BigInt> {
-        let vsq = u * u * u + &self.A * u * u + u;
+        let vsq = (u * u * u + &self.A * u * u + u) * invmod(&self.B, &self.p);
 
         ts_sqrt(&vsq, &self.p)
     }
@@ -454,5 +482,28 @@ mod tests {
             let q = mc.ladder(&mc.bp, &n.into());
             assert_eq!(p, Some(q + BigInt::from_usize(178).unwrap()));
         }
+    }
+
+    #[test]
+    fn montgomery_add_test() {
+        let mc = MontgomeryCurve {
+            A: BigInt::from_str("534").unwrap(),
+            B: BigInt::from_str("1").unwrap(),
+            p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+            bp: BigInt::from_str("4").unwrap(),
+            ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
+        };
+
+        let twop_add = mc.add(&mc.bp, &mc.bp).unwrap();
+        let twop_lad = mc.ladder(&mc.bp, &BigInt::from_usize(2).unwrap());
+        println!("2P add: {}", twop_add);
+        println!("2P lad: {}", twop_lad);
+        assert_eq!(twop_add, twop_lad);
+
+        let threep_add = mc.add(&twop_lad, &mc.bp).unwrap();
+        let threep_lad = mc.ladder(&mc.bp, &BigInt::from_usize(3).unwrap());
+        println!("3P add: {}", threep_add);
+        println!("3P lad: {}", threep_lad);
+        assert_eq!(threep_add, threep_lad);
     }
 }
