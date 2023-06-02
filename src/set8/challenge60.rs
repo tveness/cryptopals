@@ -249,7 +249,70 @@ use rand::thread_rng;
 
 use crate::{set8::challenge57::get_factors, utils::*};
 
-use super::challenge59::ts_sqrt;
+use super::challenge59::{ts_sqrt, Curve, CurveParams, Point};
+
+// How can we solve the DLP in this case?
+// The ladder allows us to calculate n Q very efficiently i.e. is equivalent to our "scale" of
+// before
+// But this isn't really what we do with DLP: we hop the following way
+// g^x -> g^(x+x') -> g^(x+x'+x'')
+// which is equivalent to adding
+// We can keep track of the index and redo the ladder every time i.e. calculate
+// b P, (b+x1)P, (b+x1+x2)P, etc. very efficiently
+// The tame kangaroo is easily doable in this way
+// BUT how do we do this for the wild kangaroo?
+//
+// In this case, it will be easier to do this for the Weierstrass curve as we already have all the
+// addition sorted out
+// Furthermore, I prefer giant-step baby-step :)
+
+// b_pub = (x+modulus n) P
+
+// b_priv = x+modulus n
+// (b_priv -x) = (modulus n)P
+// (b_priv - x) = n (modulus P)
+
+/*
+fn dlp(b_pub: &BigInt, x: &BigInt, modulus: &BigInt) -> Option<BigInt> {
+    let curve = Curve {
+        params: CurveParams {
+            a: BigInt::from_str("-95051").unwrap(),
+            b: BigInt::from_str("11279326").unwrap(),
+            p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+            bp: Point::P {
+                x: BigInt::from_str("182").unwrap(),
+                y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
+            },
+            ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
+        },
+    };
+
+    // Convert b_pub to true b_pub
+    let b_pub = b_pub - BigInt::from_usize(178).unwrap();
+
+    // b_pub = x + modulus*n
+    // We wish to find n
+    let modn: BigInt = &b_pub - x;
+
+    let limit = 2_usize.pow(20);
+    let m = 2_usize.pow(10);
+    // Now we're going to do giant step baby step
+    let h = HashMap::new();
+    // y' = n *(modulus * P)
+    // n = i + j m
+    // First do giant step
+    for j in 0..m {
+        let jm: BigInt = curve.scale(
+            &curve.params.bp,
+            &(&curve.params.ord - &BigInt::from_usize(j * m).unwrap()),
+        );
+        let i = curve.add(&b_pub, &jm);
+        h.insert(i, j);
+    }
+
+    None
+}
+*/
 
 //  B*v^2 = u^3 + A*u^2 + u
 #[allow(non_snake_case, dead_code)]
@@ -351,10 +414,18 @@ pub fn main() -> Result<()> {
 
     println!("Order: {}", curve.ord);
     println!("Twist order: {}", twist_ord);
-    let limit = BigInt::from_usize(2).unwrap().pow(20);
+    let limit = BigInt::from_usize(2).unwrap().pow(25);
     let twist_factors = get_factors(&twist_ord, &limit);
 
     println!("Twist order factors: {:?}", twist_factors);
+    println!(
+        "Effective order: {} bits",
+        (&curve.ord
+            / twist_factors
+                .iter()
+                .fold(BigInt::from_usize(1).unwrap(), |a, x| a * x))
+        .bits()
+    );
     let mut rng = thread_rng();
     let b_priv = rng.gen_bigint_range(&BigInt::zero(), &curve.ord);
     let b_pub = curve.ladder(&curve.bp, &b_priv);

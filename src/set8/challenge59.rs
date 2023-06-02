@@ -357,7 +357,7 @@ impl Curve {
     /// 2 y y' = 3x^2 + a
     /// => m = (3 x_p^2 + a)/(2 y_p)
     /// And the rest follows in the same way
-    fn add(&self, p1: &Point, p2: &Point) -> Point {
+    pub fn add(&self, p1: &Point, p2: &Point) -> Point {
         if p1 == &Point::O {
             return p2.clone();
         }
