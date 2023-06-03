@@ -474,7 +474,10 @@ pub fn main() -> Result<()> {
         // Send point to Bob
         let b_shared = curve.ladder(&p, &b_priv);
         // Now crack this
-        let res = get_residue(&curve, &p, &b_shared, &r).unwrap();
+        let res = get_residue(&curve, &p, &b_shared, &r)
+            .unwrap()
+            .mod_floor(&r);
+        // res is "+ve" root
         println!("res: {}", res);
         println!("-res: {}", (-&res).mod_floor(&r));
         println!("b_priv % r: {}", b_priv.mod_floor(&r));
@@ -487,14 +490,20 @@ pub fn main() -> Result<()> {
                 let p_i = invmod(&p, &q);
                 let q_i = invmod(&q, &p);
 
-                let crt_a: BigInt =
-                    (&running_residue * &p * &p_i + &res * &q * &q_i).mod_floor(&(&p * &q));
-                let crt_b: BigInt =
-                    (&running_residue * &p * &p_i + (&p - &res) * &q * &q_i).mod_floor(&(&p * &q));
-                let crt_c: BigInt = ((&q - &running_residue) * &p * &p_i + (&p - &res) * &q * &q_i)
-                    .mod_floor(&(&p * &q));
-                let crt_d: BigInt =
-                    ((&q - &running_residue) * &p * &p_i + &res * &q * &q_i).mod_floor(&(&p * &q));
+                let rrp = running_residue.mod_floor(&q);
+                let rrm = (-&running_residue).mod_floor(&q);
+                println!("rrp: {}", rrp);
+                println!("rrm: {}", rrm);
+
+                let resp = res.mod_floor(&p);
+                let resm = (-&res).mod_floor(&p);
+                println!("resp: {}", resp);
+                println!("resm: {}", resm);
+
+                let crt_a: BigInt = (&rrp * &p * &p_i + &resp * &q * &q_i).mod_floor(&(&p * &q));
+                let crt_b: BigInt = (&rrp * &p * &p_i + &resm * &q * &q_i).mod_floor(&(&p * &q));
+                let crt_c: BigInt = (&rrm * &p * &p_i + &resp * &q * &q_i).mod_floor(&(&p * &q));
+                let crt_d: BigInt = (&rrm * &p * &p_i + &resm * &q * &q_i).mod_floor(&(&p * &q));
 
                 running_modulus = &p * &q;
                 println!("Running modulus: {}", running_modulus);
@@ -509,6 +518,8 @@ pub fn main() -> Result<()> {
                 println!("ladder(p_new,{}): {}", q, curve.ladder(&p_new, &q));
                 let b_a = curve.ladder(&p_new, &crt_a);
                 let b_b = curve.ladder(&p_new, &crt_b);
+                let b_c = curve.ladder(&p_new, &crt_c);
+                let b_d = curve.ladder(&p_new, &crt_d);
                 let b_new = curve.ladder(&p_new, &b_priv);
 
                 println!("x_a: {}", crt_a);
@@ -518,10 +529,30 @@ pub fn main() -> Result<()> {
                 println!("b_priv % mod: {}", b_priv.mod_floor(&running_modulus));
                 println!("b_a: {}", b_a);
                 println!("b_b: {}", b_b);
+                println!("b_c: {}", b_c);
+                println!("b_d: {}", b_d);
                 println!("b_new: {}", b_new);
+
+                if b_a == b_new {
+                    running_residue = crt_a;
+                } else if b_b == b_new {
+                    running_residue = crt_b;
+                } else if b_c == b_new {
+                    running_residue = crt_c;
+                } else if b_d == b_new {
+                    running_residue = crt_d;
+                } else {
+                    panic!("Neither worked!");
+                }
+                println!("running res: {}", running_residue);
+                println!(
+                    "running res: {}",
+                    (-&running_residue).mod_floor(&running_modulus)
+                );
             }
             true => {
                 running_modulus = &running_modulus * r;
+                running_residue = res.mod_floor(&r);
             }
         };
         rx.push((r.clone(), res.clone()));
@@ -539,6 +570,26 @@ pub fn main() -> Result<()> {
     println!("running residue = {}", running_residue);
     println!("-running residue = {}", &running_modulus - &running_residue);
 
+    // We're now going to big-step little-step this
+    // Unfortunately, the ladder is not terribly helpful here, so we'll instead use the Weierstrass
+    // curve, as here we have good old addition
+
+    let cracked = match shanks_for_mc(&running_residue, &running_modulus, &b_pub) {
+        Some(x) => x,
+        None => match shanks_for_mc(
+            &(&running_modulus - &running_residue),
+            &running_modulus,
+            &b_pub,
+        ) {
+            Some(x) => x,
+            None => panic!("Never found!"),
+        },
+    };
+    println!("Cracked: {}", cracked);
+    println!("b_priv: {}", b_priv);
+
+    assert_eq!(cracked, b_priv);
+
     // index = x mod m
 
     // Now do a Kangaroo on this
@@ -551,6 +602,9 @@ pub fn main() -> Result<()> {
     Ok(())
 }
 
+fn shanks_for_mc(res: &BigInt, modulus: &BigInt, b_pub: &BigInt) -> Option<BigInt> {
+    None
+}
 fn get_residue(
     curve: &MontgomeryCurve,
     pt: &BigInt,
