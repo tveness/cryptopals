@@ -237,6 +237,37 @@
 //! combinatorial explosion of potential CRT outputs. Try sending extra
 //! queries to narrow the range of possibilities.
 
+// Regarding the hint, what does this mean?
+// Well, the problem here is that because we are only working with the one coordinate we lose some
+// information on which point on the curve we are on: we are either at (x,y) or its inverse
+// (x, p-y) = -(x,y)
+// The index we recover is therefore one of two
+// Can we do better than this?
+// Imagine we have
+// x1 mod r1    OR    x1' mod r1
+// x2 mod r2    OR    x2' mod r2
+//
+// CRT then gives us 4 possible outputs
+// r1' = (r1)^{-1} mod r2
+// r2' = (r2)^{-2} mod r1
+
+// CRT would say this a solution
+// x2 r1 r1' + x1 r2 r2'   mod (r1 r2)
+//
+// This follows as if we take this mod r1 then the first term drops out as it is a multiple of r1
+// and the second term resolves to x1, and straightforwardly the other way, too
+//
+// So, our options are
+// 1.   x1 r2 r2' + x2 r1 r1'
+// 2.   - x1 r2 r2' + x2 r1 r1'
+// 3.   x1 r2 r2' - x2 r1 r1'
+// 4.   - x1 r2 r2' - x2 r1 r1'
+// If we do another query with an element of order r1 r2, then we can knock this back down to two
+//
+// So the procedure here is not to do all of the factorings straight away, but to build it up
+// slowly.
+
+use anyhow::anyhow;
 use std::{
     ops::{BitAnd, Shr},
     str::FromStr,
@@ -414,7 +445,7 @@ pub fn main() -> Result<()> {
 
     println!("Order: {}", curve.ord);
     println!("Twist order: {}", twist_ord);
-    let limit = BigInt::from_usize(2).unwrap().pow(25);
+    let limit = BigInt::from_usize(2).unwrap().pow(20);
     let twist_factors = get_factors(&twist_ord, &limit);
 
     println!("Twist order factors: {:?}", twist_factors);
@@ -431,14 +462,69 @@ pub fn main() -> Result<()> {
     let b_pub = curve.ladder(&curve.bp, &b_priv);
 
     let mut rx: Vec<(BigInt, BigInt)> = vec![];
+
+    let mut running_modulus = BigInt::from_usize(1).unwrap();
+    let mut running_residue = BigInt::zero();
+
     for r in &twist_factors[1..] {
         println!("r: {}", r);
+
         let p = gen_twist_point(&curve, &r, &twist_ord);
         println!("ladder(p,r): {}", curve.ladder(&p, &r));
         // Send point to Bob
         let b_shared = curve.ladder(&p, &b_priv);
         // Now crack this
-        rx.push((r.clone(), get_residue(&curve, &p, &b_shared, &r)));
+        let res = get_residue(&curve, &p, &b_shared, &r).unwrap();
+        println!("res: {}", res);
+        println!("-res: {}", (-&res).mod_floor(&r));
+        println!("b_priv % r: {}", b_priv.mod_floor(&r));
+
+        // The true residue could be +- this, so try both
+        match running_modulus == BigInt::from_usize(1).unwrap() {
+            false => {
+                let p = r.clone();
+                let q = running_modulus.clone();
+                let p_i = invmod(&p, &q);
+                let q_i = invmod(&q, &p);
+
+                let crt_a: BigInt =
+                    (&running_residue * &p * &p_i + &res * &q * &q_i).mod_floor(&(&p * &q));
+                let crt_b: BigInt =
+                    (&running_residue * &p * &p_i + (&p - &res) * &q * &q_i).mod_floor(&(&p * &q));
+                let crt_c: BigInt = ((&q - &running_residue) * &p * &p_i + (&p - &res) * &q * &q_i)
+                    .mod_floor(&(&p * &q));
+                let crt_d: BigInt =
+                    ((&q - &running_residue) * &p * &p_i + &res * &q * &q_i).mod_floor(&(&p * &q));
+
+                running_modulus = &p * &q;
+                println!("Running modulus: {}", running_modulus);
+                let p_new = gen_twist_point(&curve, &running_modulus, &twist_ord);
+
+                println!(
+                    "ladder(p_new,{}): {}",
+                    running_modulus,
+                    curve.ladder(&p_new, &running_modulus)
+                );
+                println!("ladder(p_new,{}): {}", p, curve.ladder(&p_new, &p));
+                println!("ladder(p_new,{}): {}", q, curve.ladder(&p_new, &q));
+                let b_a = curve.ladder(&p_new, &crt_a);
+                let b_b = curve.ladder(&p_new, &crt_b);
+                let b_new = curve.ladder(&p_new, &b_priv);
+
+                println!("x_a: {}", crt_a);
+                println!("x_b: {}", crt_b);
+                println!("x_c: {}", crt_c);
+                println!("x_d: {}", crt_d);
+                println!("b_priv % mod: {}", b_priv.mod_floor(&running_modulus));
+                println!("b_a: {}", b_a);
+                println!("b_b: {}", b_b);
+                println!("b_new: {}", b_new);
+            }
+            true => {
+                running_modulus = &running_modulus * r;
+            }
+        };
+        rx.push((r.clone(), res.clone()));
     }
     println!("Residues: {:?}", rx);
 
@@ -446,6 +532,12 @@ pub fn main() -> Result<()> {
     println!("Crt result: {:?}", crt_result);
     let x = crt_result.0;
     let m = crt_result.1;
+
+    // Check CRT is working
+    println!("bpriv = {x} mod {m}");
+    println!("bpriv mod m = {}", &b_priv % &m);
+    println!("running residue = {}", running_residue);
+    println!("-running residue = {}", &running_modulus - &running_residue);
 
     // index = x mod m
 
@@ -459,15 +551,20 @@ pub fn main() -> Result<()> {
     Ok(())
 }
 
-fn get_residue(curve: &MontgomeryCurve, pt: &BigInt, b_shared: &BigInt, r: &BigInt) -> BigInt {
+fn get_residue(
+    curve: &MontgomeryCurve,
+    pt: &BigInt,
+    b_shared: &BigInt,
+    r: &BigInt,
+) -> Result<BigInt> {
     let mut index = BigInt::zero();
     while &curve.ladder(&pt, &index) != b_shared {
         index += 1;
         if &index > r {
-            panic!("index bigger than r");
+            return Err(anyhow!("Residue not found"));
         }
     }
-    index
+    Ok(index)
 }
 
 fn gen_twist_point(curve: &MontgomeryCurve, r: &BigInt, twist_order: &BigInt) -> BigInt {
