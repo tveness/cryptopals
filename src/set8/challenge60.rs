@@ -447,7 +447,7 @@ pub fn main() -> Result<()> {
 
     println!("Order: {}", curve.ord);
     println!("Twist order: {}", twist_ord);
-    let limit = BigInt::from_usize(2).unwrap().pow(20);
+    let limit = BigInt::from_usize(2).unwrap().pow(24);
     let twist_factors = get_factors(&twist_ord, &limit);
 
     println!("Twist order factors: {:?}", twist_factors);
@@ -561,27 +561,30 @@ pub fn main() -> Result<()> {
     }
     println!("Residues: {:?}", rx);
 
-    let crt_result = crt(&rx);
-    println!("Crt result: {:?}", crt_result);
-    let x = crt_result.0;
-    let m = crt_result.1;
+    //let crt_result = crt(&rx);
+    //println!("Crt result: {:?}", crt_result);
+    //let x = crt_result.0;
+    //let m = crt_result.1;
 
-    // Check CRT is working
-    println!("bpriv = {x} mod {m}");
-    println!("bpriv mod m = {}", &b_priv % &m);
+    //// Check CRT is working
+    //println!("bpriv = {x} mod {m}");
+    println!("bpriv mod m = {}", &b_priv % &running_modulus);
     println!("running residue = {}", running_residue);
     println!("-running residue = {}", &running_modulus - &running_residue);
 
     // We're now going to big-step little-step this
     // Unfortunately, the ladder is not terribly helpful here, so we'll instead use the Weierstrass
     // curve, as here we have good old addition
+    let bits = (twist_ord / &running_modulus).bits() as u32;
+    println!("Remaining bits: {}", bits);
 
-    let cracked = match shanks_for_mc(&running_residue, &running_modulus, &b_pub) {
+    let cracked = match shanks_for_mc(&running_residue, &running_modulus, &b_pub, bits) {
         Some(x) => x,
         None => match shanks_for_mc(
             &(&running_modulus - &running_residue),
             &running_modulus,
             &b_pub,
+            bits,
         ) {
             Some(x) => x,
             None => panic!("Never found!"),
@@ -605,7 +608,7 @@ pub fn main() -> Result<()> {
     Ok(())
 }
 
-fn shanks_for_mc(res: &BigInt, modulus: &BigInt, b_pub: &BigInt) -> Option<BigInt> {
+fn shanks_for_mc(res: &BigInt, modulus: &BigInt, b_pub: &BigInt, bits: u32) -> Option<BigInt> {
     // First convert b_pub point from Montgomery curve to Weierstrass
     // N.B. that b_priv will actually be ill-defined from this procedure, as there are two points
     // which generate b_pub: b_priv, and ord-b_priv
@@ -628,6 +631,7 @@ fn shanks_for_mc(res: &BigInt, modulus: &BigInt, b_pub: &BigInt) -> Option<BigIn
     //     u = x - 178
     //     v = y
     let x = b_pub + &BigInt::from_usize(178).unwrap();
+    // y^2 = x^3 + ax + b
     let y2: BigInt = &x * &x * &x + &curve.params.a * &x + &curve.params.b;
 
     let y = ts_sqrt(&y2, &curve.params.p).unwrap();
@@ -641,13 +645,17 @@ fn shanks_for_mc(res: &BigInt, modulus: &BigInt, b_pub: &BigInt) -> Option<BigIn
     // We will just store the x-coordinate for simplicty
     let mut hm = HashMap::new();
 
-    let limit = 2_usize.pow(40);
-    let m: usize = limit.sqrt();
+    let m = 2_usize.pow(bits / 2);
     // Let's now make the hash-table of giant steps
     // We will denote n = i + j m, m = 0...sqrt(n)
-    let thou = BigInt::from_usize(1000).unwrap();
-    let dj = curve.scale(&curve.params.bp, &BigInt::from_usize(m).unwrap());
-    let mut j_p = curve.scale(&curve.params.bp, &res);
+
+    let dj = curve
+        .scale(&curve.params.bp, &BigInt::from_usize(m).unwrap())
+        .invert(&curve.params.p);
+    let mut b_sub = curve.add(
+        &b_pub,
+        &curve.scale(&curve.params.bp, res).invert(&curve.params.p),
+    );
 
     let spinner = ProgressBar::new_spinner();
     for j in 0..m {
@@ -656,10 +664,11 @@ fn shanks_for_mc(res: &BigInt, modulus: &BigInt, b_pub: &BigInt) -> Option<BigIn
             spinner.tick();
         }
         if j != 0 {
-            j_p = curve.add(&j_p, &dj);
+            b_sub = curve.add(&b_sub, &dj);
         }
-        let b_sub = curve.add(&b_pub, &j_p.invert(&curve.params.p));
+        // b_sub = (b_priv - res - j m) P
         hm.insert(b_sub.get_x().unwrap(), j);
+        // Should then simply need to scan the hashmap for i P
     }
     spinner.finish();
     // Now baby step
@@ -809,5 +818,32 @@ mod tests {
         println!("p2: {p2}");
 
         assert_eq!(p1, p2);
+    }
+
+    #[test]
+    fn montgomery_shanks_test() {
+        let mc = MontgomeryCurve {
+            A: BigInt::from_str("534").unwrap(),
+            B: BigInt::from_str("1").unwrap(),
+            p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+            bp: BigInt::from_str("4").unwrap(),
+            ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
+        };
+
+        let mut rng = thread_rng();
+
+        let f1 = BigInt::from_str("405373").unwrap();
+        let modulus: BigInt = f1;
+        // Generate a random index which we can find quickly
+        let res = rng.gen_bigint_range(&BigInt::zero(), &modulus);
+        let j = rng.gen_bigint_range(&BigInt::zero(), &modulus);
+        let i = rng.gen_bigint_range(&BigInt::zero(), &modulus);
+        let index: BigInt = &i + &j * &modulus;
+        let bits = index.bits() as u32;
+        println!("Bits: {bits}");
+        let b_priv: BigInt = &res + &index;
+        let b_pub = mc.ladder(&mc.bp, &b_priv);
+        let crack = shanks_for_mc(&res, &modulus, &b_pub, bits);
+        assert_eq!(Some(b_priv), crack);
     }
 }
