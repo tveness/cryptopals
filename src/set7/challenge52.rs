@@ -398,14 +398,14 @@ mod tests {
         // Pick two random paths through the tree and verify hashes are the same
         let mut hasher_one = Crash::new(initial_val);
         let mut hasher_two = Crash::new(initial_val);
-        for i in 0..n {
+        for pair in collision_pairs.iter().take(n) {
             match rng.gen::<bool>() {
-                true => hasher_one.update(&collision_pairs[i].1),
-                false => hasher_one.update(&collision_pairs[i].0),
+                true => hasher_one.update(&pair.1),
+                false => hasher_one.update(&pair.0),
             }
             match rng.gen::<bool>() {
-                true => hasher_two.update(&collision_pairs[i].1),
-                false => hasher_two.update(&collision_pairs[i].0),
+                true => hasher_two.update(&pair.1),
+                false => hasher_two.update(&pair.0),
             }
         }
 

@@ -276,7 +276,7 @@ use std::{
 };
 
 use num_bigint::{BigInt, RandBigInt};
-use num_integer::{Integer, Roots};
+use num_integer::Integer;
 use num_traits::{FromPrimitive, Zero};
 use rand::thread_rng;
 
@@ -389,6 +389,7 @@ impl MontgomeryCurve {
         (&u2 * w2.modpow(&(&self.p - two), &self.p)) % &self.p
     }
 
+    /*
     fn add(&self, u1: &BigInt, u2: &BigInt) -> Result<BigInt> {
         //     B*v^2 = u^3 + A*u^2 + u
         let v1 = self.get_v(&u1)?.mod_floor(&self.p);
@@ -415,6 +416,7 @@ impl MontgomeryCurve {
         };
         Ok(u3.mod_floor(&self.p))
     }
+    */
 
     fn get_v(&self, u: &BigInt) -> Result<BigInt> {
         let vsq = (u * u * u + &self.A * u * u + u) * invmod(&self.B, &self.p);
@@ -471,18 +473,18 @@ pub fn main() -> Result<()> {
     for r in &twist_factors[1..] {
         println!("r: {}", r);
 
-        let p = gen_twist_point(&curve, &r, &twist_ord);
-        println!("ladder(p,r): {}", curve.ladder(&p, &r));
+        let p = gen_twist_point(&curve, r, &twist_ord);
+        println!("ladder(p,r): {}", curve.ladder(&p, r));
         // Send point to Bob
         let b_shared = curve.ladder(&p, &b_priv);
         // Now crack this
-        let res = get_residue(&curve, &p, &b_shared, &r)
+        let res = get_residue(&curve, &p, &b_shared, r)
             .unwrap()
-            .mod_floor(&r);
+            .mod_floor(r);
         // res is "+ve" root
         println!("res: {}", res);
-        println!("-res: {}", (-&res).mod_floor(&r));
-        println!("b_priv % r: {}", b_priv.mod_floor(&r));
+        println!("-res: {}", (-&res).mod_floor(r));
+        println!("b_priv % r: {}", b_priv.mod_floor(r));
 
         // The true residue could be +- this, so try both
         match running_modulus == BigInt::from_usize(1).unwrap() {
@@ -554,7 +556,7 @@ pub fn main() -> Result<()> {
             }
             true => {
                 running_modulus = &running_modulus * r;
-                running_residue = res.mod_floor(&r);
+                running_residue = res.mod_floor(r);
             }
         };
         rx.push((r.clone(), res.clone()));
@@ -591,10 +593,13 @@ pub fn main() -> Result<()> {
         },
     };
     println!("Cracked: {}", cracked);
-    println!("Other cracked: {}", &curve.ord - &cracked);
+    let other_cracked: BigInt = &curve.ord - &cracked;
+    println!("Other cracked: {}", other_cracked);
     println!("b_priv: {}", b_priv);
 
-    assert_eq!(cracked, b_priv);
+    let found: bool = (cracked == b_priv) || (other_cracked == b_priv);
+
+    assert!(found);
 
     // index = x mod m
 
@@ -725,7 +730,7 @@ fn shanks_for_mc(res: &BigInt, modulus: &BigInt, b_pub: &BigInt, bits: u32) -> O
         // Now baby step
         // The entries in the hashmap should now be in the range (0..m) modulus P,
         // so we just need to check if this is in there
-        let di = curve.scale(&curve.params.bp, &modulus);
+        let di = curve.scale(&curve.params.bp, modulus);
         let mut i_p = Point::O;
         let spinner = ProgressBar::new_spinner();
         for i in 0..m {
@@ -738,19 +743,16 @@ fn shanks_for_mc(res: &BigInt, modulus: &BigInt, b_pub: &BigInt, bits: u32) -> O
                 //i_p = curve.scale(&curve.params.bp, &(modulus * &ib));
                 i_p = curve.add(&i_p, &di);
             }
-            if i == 928 {
-                println!("Target i_P: {:?}", i_p);
-            }
 
             let b_x = i_p.clone();
             if let Some(f) = hm.get(&b_x) {
-                println!("Found a hit: i: {}, j: {}", ib, f);
-                println!("res: {res}");
+                //println!("Found a hit: i: {}, j: {}", ib, f);
+                //println!("res: {res}");
                 spinner.finish();
                 //let ib = BigInt::from_str("928").unwrap();
                 //let f = BigInt::from_str("353").unwrap();
                 let index: BigInt = &ib + m * f;
-                println!("Index: {}", index);
+                //println!("Index: {}", index);
                 let full_index: BigInt = res + modulus * &index;
                 return Some(full_index);
             }
@@ -767,7 +769,7 @@ fn get_residue(
     r: &BigInt,
 ) -> Result<BigInt> {
     let mut index = BigInt::zero();
-    while &curve.ladder(&pt, &index) != b_shared {
+    while &curve.ladder(pt, &index) != b_shared {
         index += 1;
         if &index > r {
             return Err(anyhow!("Residue not found"));
@@ -798,6 +800,7 @@ fn gen_twist_point(curve: &MontgomeryCurve, r: &BigInt, twist_order: &BigInt) ->
     }
 }
 
+/*
 /// Takes vector of (modulus, residue) and returns result of CRT
 fn crt(rx: &[(BigInt, BigInt)]) -> (BigInt, BigInt) {
     let total_prod = rx
@@ -811,6 +814,7 @@ fn crt(rx: &[(BigInt, BigInt)]) -> (BigInt, BigInt) {
     }
     (result % &total_prod, total_prod)
 }
+*/
 
 #[cfg(test)]
 mod tests {
@@ -971,7 +975,7 @@ mod tests {
             .scale(&curve.params.bp, &BigInt::from_str("5").unwrap())
             .invert(&curve.params.p);
 
-        let mut minus_4_alt = plus_24.clone();
+        let mut minus_4_alt = plus_24;
         minus_4_alt = curve.add(&minus_4_alt, &minus_5);
         minus_4_alt = curve.add(&minus_4_alt, &minus_5);
         minus_4_alt = curve.add(&minus_4_alt, &minus_5);
