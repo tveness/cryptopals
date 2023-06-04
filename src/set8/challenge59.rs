@@ -291,7 +291,7 @@ pub struct CurveParams {
     pub bp: Point,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum Point {
     P { x: BigInt, y: BigInt },
     O,

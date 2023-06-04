@@ -632,67 +632,131 @@ fn shanks_for_mc(res: &BigInt, modulus: &BigInt, b_pub: &BigInt, bits: u32) -> O
     //     v = y
     let x = b_pub + &BigInt::from_usize(178).unwrap();
     // y^2 = x^3 + ax + b
-    let y2: BigInt = &x * &x * &x + &curve.params.a * &x + &curve.params.b;
+    let y2: BigInt =
+        (&x * &x * &x + &curve.params.a * &x + &curve.params.b).mod_floor(&curve.params.p);
 
-    let y = ts_sqrt(&y2, &curve.params.p).unwrap();
+    let y_one = ts_sqrt(&y2, &curve.params.p).unwrap();
 
-    // We now have b_pub as a point
-    let b_pub = Point::P { x, y };
+    let ys: [BigInt; 2] = [y_one.clone(), &curve.params.p - &y_one];
 
-    // b_pub now = b_priv P, where P is our base point
-    // We have established that b_pub = (res + n * modulus) P
-    // So, let's scan over all the different ms until we have a hit
-    // We will just store the x-coordinate for simplicty
-    let mut hm = HashMap::new();
+    for y in ys {
+        // We now have b_pub as a point
+        let b_pub = Point::P { x: x.clone(), y };
+        println!("Reconstructed Weierstrass point: {:?}", b_pub);
 
-    let m = 2_usize.pow(bits / 2);
-    // Let's now make the hash-table of giant steps
-    // We will denote n = i + j m, m = 0...sqrt(n)
+        // b_pub now = b_priv P, where P is our base point
+        // We have established that b_pub = (res + n * modulus) P
+        // So, let's scan over all the different ms until we have a hit
+        // We will just store the x-coordinate for simplicty
+        let mut hm = HashMap::new();
 
-    let dj = curve
-        .scale(&curve.params.bp, &BigInt::from_usize(m).unwrap())
-        .invert(&curve.params.p);
-    let mut b_sub = curve.add(
-        &b_pub,
-        &curve.scale(&curve.params.bp, res).invert(&curve.params.p),
-    );
+        let m = 2_usize.pow(bits / 2);
+        // Let's now make the hash-table of giant steps
+        // We will denote n = i + j m, m = 0...sqrt(n)
 
-    let spinner = ProgressBar::new_spinner();
-    for j in 0..m {
-        if j.is_multiple_of(&1000) {
-            spinner.set_message(format!("Giant step {}: {}", j, m));
-            spinner.tick();
-        }
-        if j != 0 {
+        // For the giant step
+        // dj = (-m modulus P)
+        let dj = curve
+            .scale(
+                &curve.params.bp,
+                &(modulus * &BigInt::from_usize(m).unwrap()),
+            )
+            .invert(&curve.params.p);
+        // b_sub = b_pub - res P
+        let mut b_sub = curve.add(
+            &b_pub,
+            &curve.scale(&curve.params.bp, res).invert(&curve.params.p),
+        );
+
+        println!("Reconstructed Weierstrass point - res P: {:?}", b_sub);
+
+        let fake_index = BigInt::from_str("362400").unwrap();
+
+        println!(
+            "Fake recon: {:?}",
+            curve.scale(&curve.params.bp, &(modulus * &fake_index))
+        );
+        println!("m: {}", m);
+
+        // Should be
+        // j= 353
+        // i= 928
+        //let b_priv = BigInt::from_str("146907443384").unwrap();
+
+        let spinner = ProgressBar::new_spinner();
+        for j in 0..m {
+            if j.is_multiple_of(&1000) {
+                spinner.set_message(format!("Giant step {}: {}", j, m));
+                spinner.tick();
+            }
+            // Now subtract off m P at each step
+            // b_sub = (b_priv - res - j m modulus) P
+            //let b_sub_alleged = curve.scale(
+            //    &curve.params.bp,
+            //    &(&b_priv - res - (j * m) * modulus).mod_floor(&curve.params.ord),
+            //);
+            //println!("j: {}", j);
+            ////println!("True b_sub: {:?}", b_sub_alleged);
+            //println!("b_sub:      {:?}", b_sub);
+            //if b_sub_alleged != b_sub {
+            //    panic!("Differing");
+            //}
+
+            hm.insert(b_sub.clone(), j);
             b_sub = curve.add(&b_sub, &dj);
+            // Should then simply need to scan the hashmap for i P
         }
-        // b_sub = (b_priv - res - j m) P
-        hm.insert(b_sub.get_x().unwrap(), j);
-        // Should then simply need to scan the hashmap for i P
+        spinner.finish();
+
+        // Print correct point
+        // j= 353
+        //let j = BigInt::from_usize(353).unwrap();
+        //let b_sub_alleged = curve.scale(
+        //    &curve.params.bp,
+        //    &(&b_priv - res - (j * m) * modulus).mod_floor(&curve.params.ord),
+        //);
+        //println!("Seeking: {:?}", b_sub_alleged);
+
+        //// i= 928
+        //let i_true = BigInt::from_usize(928).unwrap();
+        //let b_sub_alleged = curve.scale(&curve.params.bp, &(&i_true * modulus));
+        //println!("i_true: {:?}", b_sub_alleged);
+
+        // Now baby step
+        // The entries in the hashmap should now be in the range (0..m) modulus P,
+        // so we just need to check if this is in there
+        let di = curve.scale(&curve.params.bp, &modulus);
+        let mut i_p = Point::O;
+        let spinner = ProgressBar::new_spinner();
+        for i in 0..m {
+            if i.is_multiple_of(&1000) {
+                spinner.set_message(format!("Baby step {}: {}", i, m));
+                spinner.tick();
+            }
+            let ib = BigInt::from_usize(i).unwrap();
+            if i != 0 {
+                //i_p = curve.scale(&curve.params.bp, &(modulus * &ib));
+                i_p = curve.add(&i_p, &di);
+            }
+            if i == 928 {
+                println!("Target i_P: {:?}", i_p);
+            }
+
+            let b_x = i_p.clone();
+            if let Some(f) = hm.get(&b_x) {
+                println!("Found a hit: i: {}, j: {}", ib, f);
+                println!("res: {res}");
+                spinner.finish();
+                //let ib = BigInt::from_str("928").unwrap();
+                //let f = BigInt::from_str("353").unwrap();
+                let index: BigInt = &ib + m * f;
+                println!("Index: {}", index);
+                let full_index: BigInt = res + modulus * &index;
+                return Some(full_index);
+            }
+        }
+        spinner.finish();
     }
-    spinner.finish();
-    // Now baby step
-    let di = curve.params.bp.clone();
-    let mut i_p = Point::O;
-    let spinner = ProgressBar::new_spinner();
-    for i in 0..m {
-        if i.is_multiple_of(&1000) {
-            spinner.set_message(format!("Baby step {}: {}", i, m));
-            spinner.tick();
-        }
-        if i != 0 {
-            i_p = curve.add(&i_p, &di);
-        }
-        let ib = BigInt::from_usize(i).unwrap();
-        let b_x = i_p.get_x().unwrap_or(BigInt::zero());
-        if let Some(f) = hm.get(&b_x) {
-            spinner.finish();
-            let index: BigInt = &ib + m * f;
-            let full_index: BigInt = res + modulus * &index;
-            return Some(full_index);
-        }
-    }
-    spinner.finish();
 
     None
 }
@@ -830,21 +894,89 @@ mod tests {
             ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
         };
 
+        let wc = Curve {
+            params: CurveParams {
+                a: BigInt::from_str("-95051").unwrap(),
+                b: BigInt::from_str("11279326").unwrap(),
+                p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+                bp: Point::P {
+                    x: BigInt::from_str("182").unwrap(),
+                    y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
+                },
+                ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
+            },
+        };
+
         let mut rng = thread_rng();
 
         let f1 = BigInt::from_str("405373").unwrap();
         let modulus: BigInt = f1;
         // Generate a random index which we can find quickly
         let res = rng.gen_bigint_range(&BigInt::zero(), &modulus);
-        let j = rng.gen_bigint_range(&BigInt::zero(), &modulus);
-        let i = rng.gen_bigint_range(&BigInt::zero(), &modulus);
-        let index: BigInt = &i + &j * &modulus;
-        let bits = index.bits() as u32;
-        println!("Index: {index}");
-        println!("Bits: {bits}");
-        let b_priv: BigInt = &res + &index;
+        let index = rng.gen_bigint_range(&BigInt::zero(), &modulus);
+        //let index: BigInt = &i + &j * &modulus;
+        //let res = BigInt::from_usize(50).unwrap();
+        //let index = BigInt::from_usize(160).unwrap();
+        //
+        //
+        // Fix with some which fail the test
+        //let res = BigInt::from_str("268184").unwrap();
+        //let index = BigInt::from_str("362400").unwrap();
+
+        // b_priv: 146907443384
+
+        let b_priv: BigInt = &res + &modulus * &index;
+
+        let wp = wc.scale(&wc.params.bp, &b_priv);
+        println!("Weierstrass point: {:?}", wp);
+
+        let b_sub = wc.scale(&wc.params.bp, &(&modulus * &index));
+        println!("Weierstrass - res: {:?}", b_sub);
+
         let b_pub = mc.ladder(&mc.bp, &b_priv);
-        let crack = shanks_for_mc(&res, &modulus, &b_pub, bits);
+        let bits = index.bits() as u32;
+        println!("res: {res}");
+        println!("Index: {index}");
+        println!("b_priv: {b_priv}");
+        println!("Bits: {bits}");
+        let crack = shanks_for_mc(&res, &modulus, &b_pub, bits + 1);
+        println!("b_pub: {b_pub}");
+        if let Some(x) = crack.clone() {
+            println!("b_pub? {}", mc.ladder(&mc.bp, &x));
+        }
         assert_eq!(Some(b_priv), crack);
+    }
+
+    #[test]
+    fn ec_scaling_test() {
+        let curve = Curve {
+            params: CurveParams {
+                a: BigInt::from_str("-95051").unwrap(),
+                b: BigInt::from_str("11279326").unwrap(),
+                p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+                bp: Point::P {
+                    x: BigInt::from_str("182").unwrap(),
+                    y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
+                },
+                ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
+            },
+        };
+
+        let minus_4 = curve
+            .scale(&curve.params.bp, &BigInt::from_str("4").unwrap())
+            .invert(&curve.params.p);
+
+        let plus_24 = curve.scale(&curve.params.bp, &BigInt::from_str("16").unwrap());
+        let minus_5 = curve
+            .scale(&curve.params.bp, &BigInt::from_str("5").unwrap())
+            .invert(&curve.params.p);
+
+        let mut minus_4_alt = plus_24.clone();
+        minus_4_alt = curve.add(&minus_4_alt, &minus_5);
+        minus_4_alt = curve.add(&minus_4_alt, &minus_5);
+        minus_4_alt = curve.add(&minus_4_alt, &minus_5);
+        minus_4_alt = curve.add(&minus_4_alt, &minus_5);
+
+        assert_eq!(minus_4, minus_4_alt);
     }
 }
