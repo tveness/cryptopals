@@ -478,9 +478,7 @@ pub fn main() -> Result<()> {
         // Send point to Bob
         let b_shared = curve.ladder(&p, &b_priv);
         // Now crack this
-        let res = get_residue(&curve, &p, &b_shared, r)
-            .unwrap()
-            .mod_floor(r);
+        let res = get_residue(&curve, &p, &b_shared, r).mod_floor(r);
         // res is "+ve" root
         println!("res: {}", res);
         println!("-res: {}", (-&res).mod_floor(r));
@@ -762,7 +760,16 @@ fn shanks_for_mc(res: &BigInt, modulus: &BigInt, b_pub: &BigInt, bits: u32) -> O
 
     None
 }
-fn get_residue(
+
+fn get_residue(curve: &MontgomeryCurve, pt: &BigInt, b_shared: &BigInt, r: &BigInt) -> BigInt {
+    loop {
+        if let Ok(res) = try_get_residue(curve, pt, b_shared, r) {
+            return res;
+        }
+    }
+}
+
+fn try_get_residue(
     curve: &MontgomeryCurve,
     pt: &BigInt,
     b_shared: &BigInt,
