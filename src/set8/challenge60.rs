@@ -840,6 +840,7 @@ mod tests {
         let i = rng.gen_bigint_range(&BigInt::zero(), &modulus);
         let index: BigInt = &i + &j * &modulus;
         let bits = index.bits() as u32;
+        println!("Index: {index}");
         println!("Bits: {bits}");
         let b_priv: BigInt = &res + &index;
         let b_pub = mc.ladder(&mc.bp, &b_priv);
