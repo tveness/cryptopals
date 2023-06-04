@@ -306,7 +306,7 @@ impl Point {
         }
     }
 
-    fn invert(&self, p: &BigInt) -> Self {
+    pub fn invert(&self, p: &BigInt) -> Self {
         if let Self::P { x, y } = self {
             Self::P {
                 x: x.clone(),

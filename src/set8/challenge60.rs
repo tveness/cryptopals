@@ -268,13 +268,15 @@
 // slowly.
 
 use anyhow::anyhow;
+use indicatif::ProgressBar;
 use std::{
+    collections::HashMap,
     ops::{BitAnd, Shr},
     str::FromStr,
 };
 
 use num_bigint::{BigInt, RandBigInt};
-use num_integer::Integer;
+use num_integer::{Integer, Roots};
 use num_traits::{FromPrimitive, Zero};
 use rand::thread_rng;
 
@@ -586,6 +588,7 @@ pub fn main() -> Result<()> {
         },
     };
     println!("Cracked: {}", cracked);
+    println!("Other cracked: {}", &curve.ord - &cracked);
     println!("b_priv: {}", b_priv);
 
     assert_eq!(cracked, b_priv);
@@ -603,6 +606,85 @@ pub fn main() -> Result<()> {
 }
 
 fn shanks_for_mc(res: &BigInt, modulus: &BigInt, b_pub: &BigInt) -> Option<BigInt> {
+    // First convert b_pub point from Montgomery curve to Weierstrass
+    // N.B. that b_priv will actually be ill-defined from this procedure, as there are two points
+    // which generate b_pub: b_priv, and ord-b_priv
+    // This must be true, because (x,y) and (x,-y) add to give O by the geometric rule
+
+    // So, we will pick the positive sqrt of the equation to get started and work from there
+    let curve = Curve {
+        params: CurveParams {
+            a: BigInt::from_str("-95051").unwrap(),
+            b: BigInt::from_str("11279326").unwrap(),
+            p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+            bp: Point::P {
+                x: BigInt::from_str("182").unwrap(),
+                y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
+            },
+            ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
+        },
+    };
+
+    //     u = x - 178
+    //     v = y
+    let x = b_pub + &BigInt::from_usize(178).unwrap();
+    let y2: BigInt = &x * &x * &x + &curve.params.a * &x + &curve.params.b;
+
+    let y = ts_sqrt(&y2, &curve.params.p).unwrap();
+
+    // We now have b_pub as a point
+    let b_pub = Point::P { x, y };
+
+    // b_pub now = b_priv P, where P is our base point
+    // We have established that b_pub = (res + n * modulus) P
+    // So, let's scan over all the different ms until we have a hit
+    // We will just store the x-coordinate for simplicty
+    let mut hm = HashMap::new();
+
+    let limit = 2_usize.pow(40);
+    let m: usize = limit.sqrt();
+    // Let's now make the hash-table of giant steps
+    // We will denote n = i + j m, m = 0...sqrt(n)
+    let thou = BigInt::from_usize(1000).unwrap();
+    let dj = curve.scale(&curve.params.bp, &BigInt::from_usize(m).unwrap());
+    let mut j_p = curve.scale(&curve.params.bp, &res);
+
+    let spinner = ProgressBar::new_spinner();
+    for j in 0..m {
+        if j.is_multiple_of(&1000) {
+            spinner.set_message(format!("Giant step {}: {}", j, m));
+            spinner.tick();
+        }
+        if j != 0 {
+            j_p = curve.add(&j_p, &dj);
+        }
+        let b_sub = curve.add(&b_pub, &j_p.invert(&curve.params.p));
+        hm.insert(b_sub.get_x().unwrap(), j);
+    }
+    spinner.finish();
+    // Now baby step
+    let di = curve.params.bp.clone();
+    let mut i_p = Point::O;
+    let spinner = ProgressBar::new_spinner();
+    for i in 0..m {
+        if i.is_multiple_of(&1000) {
+            spinner.set_message(format!("Baby step {}: {}", i, m));
+            spinner.tick();
+        }
+        if i != 0 {
+            i_p = curve.add(&i_p, &di);
+        }
+        let ib = BigInt::from_usize(i).unwrap();
+        let b_x = i_p.get_x().unwrap();
+        if let Some(f) = hm.get(&b_x) {
+            spinner.finish();
+            let index: BigInt = &ib + m * f;
+            let full_index: BigInt = res + modulus * &index;
+            return Some(full_index);
+        }
+    }
+    spinner.finish();
+
     None
 }
 fn get_residue(
@@ -707,7 +789,7 @@ mod tests {
     }
 
     #[test]
-    fn montgomery_add_test() {
+    fn montgomery_dup_test() {
         let mc = MontgomeryCurve {
             A: BigInt::from_str("534").unwrap(),
             B: BigInt::from_str("1").unwrap(),
@@ -716,16 +798,16 @@ mod tests {
             ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
         };
 
-        let twop_add = mc.add(&mc.bp, &mc.bp).unwrap();
-        let twop_lad = mc.ladder(&mc.bp, &BigInt::from_usize(2).unwrap());
-        println!("2P add: {}", twop_add);
-        println!("2P lad: {}", twop_lad);
-        assert_eq!(twop_add, twop_lad);
+        let i1 = BigInt::from_usize(50).unwrap();
+        let p1 = mc.ladder(&mc.bp, &i1);
 
-        let threep_add = mc.add(&twop_lad, &mc.bp).unwrap();
-        let threep_lad = mc.ladder(&mc.bp, &BigInt::from_usize(3).unwrap());
-        println!("3P add: {}", threep_add);
-        println!("3P lad: {}", threep_lad);
-        assert_eq!(threep_add, threep_lad);
+        let i2 = &mc.ord - BigInt::from_usize(50).unwrap();
+        let p2 = mc.ladder(&mc.bp, &i2);
+        println!("i1: {i1}");
+        println!("i2: {i2}");
+        println!("p1: {p1}");
+        println!("p2: {p2}");
+
+        assert_eq!(p1, p2);
     }
 }
