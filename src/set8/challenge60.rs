@@ -675,7 +675,7 @@ fn shanks_for_mc(res: &BigInt, modulus: &BigInt, b_pub: &BigInt) -> Option<BigIn
             i_p = curve.add(&i_p, &di);
         }
         let ib = BigInt::from_usize(i).unwrap();
-        let b_x = i_p.get_x().unwrap();
+        let b_x = i_p.get_x().unwrap_or(BigInt::zero());
         if let Some(f) = hm.get(&b_x) {
             spinner.finish();
             let index: BigInt = &ib + m * f;
