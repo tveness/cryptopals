@@ -2,6 +2,7 @@
 
 ![Completed](https://img.shields.io/github/v/tag/tveness/cryptopals?label=completed%20to%20challenge&style=for-the-badge)
 ![Tests](https://img.shields.io/github/actions/workflow/status/tveness/cryptopals/rust.yml?label=Tests&style=for-the-badge)
+[![License](https://img.shields.io/github/license/tveness/cryptopals?style=for-the-badge)](https://opensource.org/license/MIT/)
 
 A place to work through the CryptoPals challenges in Rust to hopefully learn things along the way!
 
