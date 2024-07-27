@@ -137,9 +137,7 @@ fn make_guess(oracle: &Oracle, enc: Enc) -> (String, usize) {
     // Make a guess of our id, and run through each time picking the best version
     let mut guess_id: String = bytes_to_hex(&random_key(oracle.keysize, &mut rng));
     //println!("OG guess: {}", guess_id);
-    let chars = vec![
-        'a', 'b', 'c', 'd', 'e', 'f', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-    ];
+    let chars = ['a', 'b', 'c', 'd', 'e', 'f', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
     // Have some junk which we can use to disambiguate different equally-good compression
     let mut junk = bytes_to_hex(&random_key(4, &mut rng));

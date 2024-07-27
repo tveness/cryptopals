@@ -331,7 +331,7 @@ impl Attacker {
                 .mul(self.s.modpow(&self.publickey.key, &self.publickey.modulus))
                 .mod_floor(&self.publickey.modulus);
             if is_pkcs(&self.c0, &self.privatekey) {
-                self.s0 = self.s.clone();
+                self.s0.clone_from(&self.s);
                 break;
             }
             self.s = rng.gen_bigint_range(&BigInt::zero(), &self.publickey.modulus);
@@ -350,7 +350,7 @@ impl Attacker {
     fn step2a(&mut self) {
         let three_b: BigInt = &BigInt::from_u8(3).unwrap() * &self.b;
         // Initialise s = n/3B;
-        self.s = self.publickey.modulus.clone();
+        self.s.clone_from(&self.publickey.modulus);
         self.s = self.s.div_ceil(&three_b);
 
         while !self.try_si() {
