@@ -145,8 +145,144 @@
 //! random (or chosen) ciphertext and creating a key to decrypt it to a
 //! plaintext of your choice!
 
-use crate::utils::*;
+use std::str::FromStr;
+
+use num_bigint::{BigInt, RandBigInt, Sign};
+use num_integer::Integer;
+use num_traits::One;
+use openssl::sha::sha256;
+use rand::rngs::ThreadRng;
+
+use crate::{
+    set8::challenge59::{Curve, CurveParams, Point},
+    utils::*,
+};
+
+trait Dsa {
+    fn sign(&self, m: &[u8], d: &BigInt, rng: &mut ThreadRng) -> Signature;
+    fn verify(&self, m: &[u8], sig: Signature, q: &Point) -> DsaResult;
+}
+
+#[derive(Debug, PartialEq)]
+pub enum DsaResult {
+    Valid,
+    Invalid,
+}
+
+#[derive(Debug)]
+pub struct Signature {
+    pub r: BigInt,
+    pub s: BigInt,
+}
+
+impl Dsa for Curve {
+    fn sign(&self, m: &[u8], d: &BigInt, rng: &mut ThreadRng) -> Signature {
+        let k = rng.gen_bigint_range(&BigInt::one(), &self.params.ord);
+        let kinv: BigInt = invmod(&k, &self.params.ord);
+        //println!("k: {:?}", k);
+        //println!("kin: {:?}", kinv);
+        //println!("k*k-1: {:?}", (&k * &kinv).mod_floor(&self.params.ord));
+        //println!("k: {:?}", k);
+        //println!("kG: {:?}", self.gen(&k));
+        //println!("G: {:?}", self.params.bp);
+        //println!("(k*kinvG): {:?}", self.scale(&self.gen(&kinv), &k));
+        //println!("(kinv*k G): {:?}", self.scale(&self.gen(&k), &kinv));
+
+        let r: BigInt = self.gen(&k).get_x().unwrap();
+        let hm: BigInt = BigInt::from_bytes_le(Sign::Plus, &sha256(m));
+        //println!("Hash: {:?}", hm);
+
+        let s = ((&hm + d * &r) * &kinv).mod_floor(&self.params.ord);
+
+        Signature { r, s }
+    }
+
+    fn verify(&self, m: &[u8], signature: Signature, q: &Point) -> DsaResult {
+        let hm: BigInt = BigInt::from_bytes_le(Sign::Plus, &sha256(m));
+        //println!("Hash: {:?}", hm);
+        let Signature { r, s } = signature;
+
+        let sinv = invmod(&s, &self.params.ord);
+        //println!("sinv: {:?}", sinv);
+        let u1 = &sinv * hm;
+        //println!("u1: {:?}", u1);
+        let u2 = &sinv * &r;
+        //println!("u2: {:?}", u2);
+        let test_r = self.add(&self.gen(&u1), &self.scale(q, &u2));
+        //println!("Allegedly kG: {:?}", test_r);
+        match r == test_r.get_x().unwrap() {
+            true => DsaResult::Valid,
+            false => DsaResult::Invalid,
+        }
+    }
+}
 
 pub fn main() -> Result<()> {
+    let curve = Curve {
+        params: CurveParams {
+            a: BigInt::from_str("-95051").unwrap(),
+            b: BigInt::from_str("11279326").unwrap(),
+            p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+            bp: Point::P {
+                x: BigInt::from_str("182").unwrap(),
+                y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
+            },
+            ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
+        },
+    };
+
     unimplemented!()
+}
+
+#[cfg(test)]
+mod tests {
+
+    use rand::{distributions::Alphanumeric, thread_rng, Rng};
+
+    use super::*;
+
+    #[test]
+    fn dsa_test() {
+        let curve = Curve {
+            params: CurveParams {
+                a: BigInt::from_str("-95051").unwrap(),
+                b: BigInt::from_str("11279326").unwrap(),
+                p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+                bp: Point::P {
+                    x: BigInt::from_str("182").unwrap(),
+                    y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
+                },
+                //ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
+                ord: BigInt::from_str("29246302889428143187362802287225875743").unwrap(),
+            },
+        };
+
+        let ord = BigInt::from_str("29246302889428143187362802287225875743").unwrap();
+
+        let mut rng = thread_rng();
+
+        for _ in 1..10 {
+            // Generate key-pair
+            // private key
+            let d = rng.gen_bigint_range(&BigInt::one(), &ord);
+            // public key
+            let q = curve.gen(&d);
+            let message: String = rng
+                .clone()
+                .sample_iter(&Alphanumeric)
+                .take(20)
+                .map(char::from)
+                .collect();
+            println!("Public key: {q:?}");
+            println!("Message: {message}");
+            let message_bytes = message.as_bytes();
+            let sig = curve.sign(message_bytes, &d, &mut rng);
+            println!("Signature: {sig:?}");
+
+            let verify = curve.verify(message_bytes, sig, &q);
+            println!("Verified: {:?}", verify);
+
+            assert_eq!(verify, DsaResult::Valid);
+        }
+    }
 }
