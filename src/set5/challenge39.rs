@@ -69,6 +69,7 @@ pub fn invmod<T: ToBigInt>(a: &T, m: &T) -> BigInt {
 
     inv
 }
+
 pub fn et_n(bits: i32, e: &BigInt) -> (BigInt, BigInt) {
     let mut et: BigInt = 0.into();
     let mut n = 0.into();
