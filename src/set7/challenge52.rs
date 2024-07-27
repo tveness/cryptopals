@@ -263,9 +263,7 @@ fn gen_collision_pairs<T: CrapHasher>(
     pairs
 }
 
-fn get_bits_for_slow_collision(
-    collision_pairs: &Vec<(Vec<u8>, Vec<u8>)>,
-) -> Option<(usize, usize)> {
+fn get_bits_for_slow_collision(collision_pairs: &[(Vec<u8>, Vec<u8>)]) -> Option<(usize, usize)> {
     let mut map = HashMap::new();
     let n = collision_pairs.len();
 

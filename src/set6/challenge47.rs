@@ -188,6 +188,7 @@ impl IntervalTree {
 
 // Make a finite state machine for the state of the algorithm matching Bleichenbacher '98
 #[derive(Debug)]
+#[allow(clippy::enum_variant_names)]
 enum Step {
     Step1,
     Step2a,

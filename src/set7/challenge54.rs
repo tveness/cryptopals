@@ -121,7 +121,7 @@ impl Funnel {
                 // Ensures this is a full tree and has no loops/shortcuts
                 loop {
                     let minifunnel = MiniFunnel::new(p[0], p[1]);
-                    if map.get(&minifunnel.output_hash).is_none()
+                    if !map.contains_key(&minifunnel.output_hash)
                         && !current_layer.contains(&minifunnel.output_hash)
                     {
                         map.insert(p[0], (minifunnel.block_a, minifunnel.output_hash));
