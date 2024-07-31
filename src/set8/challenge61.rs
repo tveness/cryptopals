@@ -151,7 +151,7 @@ use num_bigint::{BigInt, RandBigInt, Sign};
 use num_integer::Integer;
 use num_traits::One;
 use openssl::sha::sha256;
-use rand::rngs::ThreadRng;
+use rand::{distributions::Alphanumeric, rngs::ThreadRng, thread_rng, Rng};
 
 use crate::{
     set6::challenge43::Params,
@@ -170,7 +170,7 @@ pub enum DsaResult {
     Invalid,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Signature {
     pub r: BigInt,
     pub s: BigInt,
@@ -263,20 +263,78 @@ pub fn main() -> Result<()> {
                 x: BigInt::from_str("182").unwrap(),
                 y: BigInt::from_str("85518893674295321206118380980485522083").unwrap(),
             },
-            ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
+            //    ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
+            ord: BigInt::from_str("29246302889428143187362802287225875743").unwrap(),
+        },
+    };
+    let ord = BigInt::from_str("29246302889428143187362802287225875743").unwrap();
+    let mut rng = thread_rng();
+    // Generate a message
+    let message: String = rng
+        .clone()
+        .sample_iter(&Alphanumeric)
+        .take(20)
+        .map(char::from)
+        .collect();
+    let message_bytes = message.as_bytes();
+
+    // And a keypair
+    // private key
+    let d = rng.gen_bigint_range(&BigInt::one(), &ord);
+    // public key
+    //let q = curve.gen(&d);
+
+    let sig = curve.sign(message_bytes, &d, &mut rng);
+    println!("Message: {}", message);
+    println!("Signature: {sig:?}");
+
+    // Now generate sneaky parameters
+    // This is all public information
+    let hm: BigInt = BigInt::from_bytes_le(Sign::Plus, &sha256(message_bytes));
+    let Signature { r, s } = sig.clone();
+    let sinv = invmod(&s, &ord);
+    let u1 = &sinv * hm;
+    let u2 = &sinv * &r;
+    let sca = &u1 + &u2 * &d;
+    #[allow(non_snake_case)]
+    let R = curve.gen(&sca);
+    println!("Check R: {R:?}");
+
+    let d_p = rng.gen_bigint_range(&BigInt::one(), &ord);
+    let t = &u1 + &u2 * &d_p;
+    let t_inv = invmod(&t, &ord);
+    #[allow(non_snake_case)]
+    let G_p = curve.scale(&R, &t_inv);
+    #[allow(non_snake_case)]
+    let Q_p = curve.scale(&G_p, &d_p);
+
+    println!("G': {G_p:?}");
+    println!("Q': {Q_p:?}");
+
+    let new_curve = Curve {
+        params: CurveParams {
+            a: BigInt::from_str("-95051").unwrap(),
+            b: BigInt::from_str("11279326").unwrap(),
+            p: BigInt::from_str("233970423115425145524320034830162017933").unwrap(),
+            bp: G_p,
+            //    ord: BigInt::from_str("233970423115425145498902418297807005944").unwrap(),
+            ord: BigInt::from_str("29246302889428143187362802287225875743").unwrap(),
         },
     };
 
-    unimplemented!()
+    // Now verify with new parameters
+    println!("Verifying with new curve");
+    let verify = new_curve.verify(message_bytes, sig, &Q_p);
+    println!("Verify: {verify:?}");
+
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
 
-    use num_traits::Num;
-    use rand::{distributions::Alphanumeric, thread_rng, Rng};
-
     use super::*;
+    use num_traits::Num;
 
     #[test]
     fn dsa_test() {
