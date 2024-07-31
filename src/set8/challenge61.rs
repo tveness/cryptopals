@@ -154,13 +154,14 @@ use openssl::sha::sha256;
 use rand::rngs::ThreadRng;
 
 use crate::{
+    set6::challenge43::Params,
     set8::challenge59::{Curve, CurveParams, Point},
     utils::*,
 };
 
-trait Dsa {
+trait Dsa<T> {
     fn sign(&self, m: &[u8], d: &BigInt, rng: &mut ThreadRng) -> Signature;
-    fn verify(&self, m: &[u8], sig: Signature, q: &Point) -> DsaResult;
+    fn verify(&self, m: &[u8], sig: Signature, q: &T) -> DsaResult;
 }
 
 #[derive(Debug, PartialEq)]
@@ -175,7 +176,42 @@ pub struct Signature {
     pub s: BigInt,
 }
 
-impl Dsa for Curve {
+impl Dsa<BigInt> for Params {
+    fn sign(&self, m: &[u8], x: &BigInt, rng: &mut ThreadRng) -> Signature {
+        let hm: BigInt = BigInt::from_bytes_le(Sign::Plus, &sha256(m));
+
+        let k = rng.gen_bigint_range(&BigInt::one(), &self.q);
+        let kinv: BigInt = invmod(&k, &self.q);
+
+        let r = self.g.modpow(&k, &self.p).mod_floor(&self.q);
+        // d is private key
+        let s = (kinv * (hm + x * &r)).mod_floor(&self.q);
+
+        Signature { r, s }
+    }
+
+    fn verify(&self, m: &[u8], sig: Signature, q: &BigInt) -> DsaResult {
+        let hm: BigInt = BigInt::from_bytes_le(Sign::Plus, &sha256(m));
+        let Signature { r, s } = sig;
+
+        let sinv = invmod(&s, &self.q);
+        //println!("sinv: {:?}", sinv);
+        let u1 = (&sinv * hm).mod_floor(&self.q);
+        //println!("u1: {:?}", u1);
+        let u2 = (&sinv * &r).mod_floor(&self.q);
+        //println!("u2: {:?}", u2);
+        let test_r = (&self.g.modpow(&u1, &self.p) * &q.modpow(&u2, &self.p))
+            .mod_floor(&self.p)
+            .mod_floor(&self.q);
+        //println!("Allegedly kG: {:?}", test_r);
+        match r == test_r {
+            true => DsaResult::Valid,
+            false => DsaResult::Invalid,
+        }
+    }
+}
+
+impl Dsa<Point> for Curve {
     fn sign(&self, m: &[u8], d: &BigInt, rng: &mut ThreadRng) -> Signature {
         let k = rng.gen_bigint_range(&BigInt::one(), &self.params.ord);
         let kinv: BigInt = invmod(&k, &self.params.ord);
@@ -237,6 +273,7 @@ pub fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
 
+    use num_traits::Num;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
     use super::*;
@@ -280,6 +317,59 @@ mod tests {
             println!("Signature: {sig:?}");
 
             let verify = curve.verify(message_bytes, sig, &q);
+            println!("Verified: {:?}", verify);
+
+            assert_eq!(verify, DsaResult::Valid);
+        }
+    }
+    #[test]
+    fn dsa_test_rsa() {
+        let p: BigInt = BigInt::from_str_radix(
+            "800000000000000089e1855218a0e7dac38136ffafa72eda7\
+         859f2171e25e65eac698c1702578b07dc2a1076da241c76c6\
+         2d374d8389ea5aeffd3226a0530cc565f3bf6b50929139ebe\
+         ac04f48c3c84afb796d61e5a4f9a8fda812ab59494232c7d2\
+         b4deb50aa18ee9e132bfa85ac4374d7f9091abc3d015efc87\
+         1a584471bb1",
+            16,
+        )
+        .unwrap();
+
+        let q: BigInt =
+            BigInt::from_str_radix("f4f47f05794b256174bba6e9b396a7707e563c5b", 16).unwrap();
+
+        let g: BigInt = BigInt::from_str_radix(
+            "5958c9d3898b224b12672c0b98e06c60df923cb8bc999d119\
+         458fef538b8fa4046c8db53039db620c094c9fa077ef389b5\
+         322a559946a71903f990f1f7e0e025e2d7f7cf494aff1a047\
+         0f5b64c36b625a097f1651fe775323556fe00b3608c887892\
+         878480e99041be601a62166ca6894bdd41a7054ec89f756ba\
+         9fc95302291",
+            16,
+        )
+        .unwrap();
+        let params = Params { p, q, g };
+        let mut rng = thread_rng();
+
+        for _ in 1..10 {
+            // Generate key-pair
+            // private key
+            let x = rng.gen_bigint_range(&BigInt::one(), &params.q);
+            // public key
+            let y = params.g.modpow(&x, &params.p);
+            let message: String = rng
+                .clone()
+                .sample_iter(&Alphanumeric)
+                .take(20)
+                .map(char::from)
+                .collect();
+            println!("Public key: {y:?}");
+            println!("Message: {message}");
+            let message_bytes = message.as_bytes();
+            let sig = params.sign(message_bytes, &x, &mut rng);
+            println!("Signature: {sig:?}");
+
+            let verify = params.verify(message_bytes, sig, &y);
             println!("Verified: {:?}", verify);
 
             assert_eq!(verify, DsaResult::Valid);
