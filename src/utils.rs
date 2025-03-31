@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use std::hash::Hash;
 use std::io::BufRead;
+use std::iter::zip;
 use std::{collections::HashMap, fs::File, io::BufReader};
 
 // Re-export useful functions introduced in specific challenges
@@ -140,29 +141,32 @@ pub fn kl_divergence<T: Eq + Hash>(p: &HashMap<T, f64>, q: &HashMap<T, f64>) -> 
         .sum()
 }
 
+/// XOR two sequences of bytes
 pub fn xor_bytes(a: &[u8], x: &[u8]) -> Vec<u8> {
     // Cycle x if possible
-    std::iter::zip(a, x.iter().cycle())
-        .map(|(&x, &y)| x ^ y)
-        .collect::<Vec<u8>>()
+    zip(a, x.iter().cycle()).map(|(&x, &y)| x ^ y).collect()
 }
+
+/// Count the number of ones in a u64
 pub fn ones(x: u8) -> u64 {
     (0..8)
-        .map(|mask_shift| match x & (1 << mask_shift) {
+        .map(|mask_shift| match (x >> mask_shift) & 1 {
             0 => 0,
             _ => 1,
         })
         .sum()
 }
 
+/// Calculate the hamming distance between two strings
 pub fn hamming(str1: &str, str2: &str) -> u64 {
     let s1b = str1.as_bytes();
     let s2b = str2.as_bytes();
     hamming_bytes(s1b, s2b)
 }
 
+///
 pub fn hamming_bytes(b1: &[u8], b2: &[u8]) -> u64 {
-    std::iter::zip(b1.iter(), b2.iter())
+    zip(b1.iter(), b2.iter())
         .map(|(x, y)| x ^ y)
         .map(ones)
         .sum()
